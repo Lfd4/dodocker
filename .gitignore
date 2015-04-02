@@ -1,0 +1,8 @@
+*~
+*.pyc
+config
+\#*\#
+bin/*
+lib/*
+include/*
+*.egg-info
