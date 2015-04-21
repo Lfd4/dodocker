@@ -6,7 +6,7 @@ setup(
     version = "0.5",
     zip_safe = True,
     packages = find_packages(),
-    install_requires = ['docker-py>=0.7',
+    install_requires = ['docker-py>=1.1.0',
                         'PyYAML>=3.11'],
     package_data = {},
     author = 'Andreas Elvers',
