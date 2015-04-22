@@ -109,7 +109,7 @@ def get_file_dep(path):
             file_list.append(os.path.join(root,i))
     return file_list
 
-def parse_dodo_yaml(mode):
+def parse_dodocker_yaml(mode):
     dep_groups = {}
     with open('dodocker.yaml','r') as f:
         yaml_data = yaml.safe_load(f)
@@ -198,7 +198,7 @@ def parse_dodo_yaml(mode):
 
 def task_build():
     all_build_tasks = []
-    for task in parse_dodo_yaml('build'):
+    for task in parse_dodocker_yaml('build'):
         all_build_tasks.append(task['basename'])
         yield task
     if all_build_tasks:
@@ -208,7 +208,7 @@ def task_build():
 
 def task_upload():
     all_upload_tasks = []
-    for task in parse_dodo_yaml('upload'):
+    for task in parse_dodocker_yaml('upload'):
         all_upload_tasks.append(task['basename'])
         yield task
 
