@@ -209,8 +209,17 @@ def task_upload():
            'actions': None,
            'task_dep': all_upload_tasks}
 
+"""
+pretty print a dump of build tasks for debugging purposes
+"""
+def task_build_dump():
+    def build_dump():
+        from pprint import pprint
+        pprint(list(task_build()))
+    return {'actions':[build_dump],
+            'verbosity':2}
+
 def main():
     import doit
     doit.run(globals())
-    #    from pprint import pprint
-    #    pprint(list(task_build()))
+
