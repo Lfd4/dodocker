@@ -4,12 +4,10 @@ doit task file
 this task file reads the task definition from dodocker.yaml
 
 """
+from __future__ import print_function
 
 DOIT_CONFIG = {'default_tasks': ['build']}
 REGISTRY = 'dr.work.de:443'
-
-
-
 
 import os, yaml, json, sys, re, time
 from doit.tools import result_dep
@@ -60,7 +58,7 @@ def check_available(image):
 def docker_build(path,tag,dockerfile):
     def docker_build_callable():
         error = False
-        print path,tag
+        print(path,tag)
         for line in doc.build(path,tag=tag,rm=True,stream=True,pull=True,dockerfile=dockerfile):
             line_parsed = json.loads(line)
             if 'stream' in line_parsed:
@@ -76,14 +74,14 @@ def docker_build(path,tag,dockerfile):
 
 def docker_tag(image,repository,tag=None):
     def docker_tag_callable():
-        print "TAG:",image,repository,tag
+        print("TAG:",image,repository,tag)
         return doc.tag(image,repository,tag,force=True)
     return docker_tag_callable
 
 def docker_push(repository,tag):
     def docker_push_callable():
         error = False
-        print "push:",repository,tag
+        print("push:",repository,tag)
         for line in doc.push(repository,stream=True,tag=tag):
             line_parsed = json.loads(line)
             if 'status' in line_parsed:
@@ -97,7 +95,6 @@ def docker_push(repository,tag):
         else:
             return False
     return docker_push_callable
-        
 
 def get_file_dep(path):
     file_list = []
