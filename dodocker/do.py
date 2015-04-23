@@ -63,13 +63,10 @@ def docker_build(path,tag,dockerfile):
             line_parsed = json.loads(line)
             if 'stream' in line_parsed:
                 sys.stdout.write(line_parsed['stream'].encode('utf8'))
-            if 'errorDetail' in line_parsed:
-                sys.stdout.write(line_parsed['errorDetail'])
+            if line_parsed.get('errorDetail'):
+                sys.stdout.write(line_parsed['errorDetail']['message']+'\n')
                 error = True
-        if not error:
-            return True
-        else:
-            return False
+        return not error
     return docker_build_callable
 
 def docker_tag(image,repository,tag=None):
@@ -86,14 +83,10 @@ def docker_push(repository,tag):
             line_parsed = json.loads(line)
             if 'status' in line_parsed:
                 sys.stdout.write(line_parsed['status']+'\n')
-            else:
-                print "hmmm", line_parsed
-            if "errorDetail" in line:
+            if line.get('errorDetail') in line:
+                sys.stdout.write(line_parsed['errorDetail']['message']+'\n')
                 error = True
-        if not error:
-            return True
-        else:
-            return False
+        return not error
     return docker_push_callable
 
 def get_file_dep(path):
