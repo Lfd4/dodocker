@@ -101,8 +101,11 @@ def get_file_dep(path):
 
 def parse_dodocker_yaml(mode):
     dep_groups = {}
-    with open('dodocker.yaml','r') as f:
-        yaml_data = yaml.safe_load(f)
+    try:
+        with open('dodocker.yaml','r') as f:
+            yaml_data = yaml.safe_load(f)
+    except IOError:
+        sys.exit('No dodocker.yaml found')
     for task_description in yaml_data:
         image = task_description['image']
 
