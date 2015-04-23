@@ -79,7 +79,11 @@ def docker_push(repository,tag):
     def docker_push_callable():
         error = False
         print("push:",repository,tag)
-        for line in doc.push(repository,stream=True,tag=tag):
+        try:
+            result = doc.push(repository,stream=True,tag=tag)
+        except docker.errors.DockerException as e:
+            sys.exit(e)
+        for line in result:
             line_parsed = json.loads(line)
             if 'status' in line_parsed:
                 sys.stdout.write(line_parsed['status']+'\n')
