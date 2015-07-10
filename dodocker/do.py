@@ -4,12 +4,10 @@ doit task file
 this task file reads the task definition from dodocker.yaml
 
 """
+from __future__ import print_function
 
 DOIT_CONFIG = {'default_tasks': ['build']}
 REGISTRY = 'dr.work.de:443'
-
-
-
 
 import os, yaml, json, sys, re, time
 from doit.tools import result_dep
@@ -58,44 +56,40 @@ def check_available(image):
 def docker_build(path,tag,dockerfile):
     def docker_build_callable():
         error = False
-        print path,tag
+        print(path,tag)
         for line in doc.build(path,tag=tag,rm=True,stream=True,pull=True,dockerfile=dockerfile):
             line_parsed = json.loads(line)
             if 'stream' in line_parsed:
                 sys.stdout.write(line_parsed['stream'].encode('utf8'))
-            if 'errorDetail' in line_parsed:
-                sys.stdout.write(line_parsed['errorDetail'])
+            if line_parsed.get('errorDetail'):
+                sys.stdout.write(line_parsed['errorDetail']['message']+'\n')
                 error = True
-        if not error:
-            return True
-        else:
-            return False
+        return not error
     return docker_build_callable
 
 def docker_tag(image,repository,tag=None):
     def docker_tag_callable():
-        print "TAG:",image,repository,tag
+        print("TAG:",image,repository,tag)
         return doc.tag(image,repository,tag,force=True)
     return docker_tag_callable
 
 def docker_push(repository,tag):
     def docker_push_callable():
         error = False
-        print "push:",repository,tag
-        for line in doc.push(repository,stream=True,tag=tag):
+        print("push:",repository,tag)
+        try:
+            result = doc.push(repository,stream=True,tag=tag)
+        except docker.errors.DockerException as e:
+            sys.exit(e)
+        for line in result:
             line_parsed = json.loads(line)
             if 'status' in line_parsed:
                 sys.stdout.write(line_parsed['status']+'\n')
-            else:
-                print "hmmm", line_parsed
-            if "errorDetail" in line:
+            if line.get('errorDetail') in line:
+                sys.stdout.write(line_parsed['errorDetail']['message']+'\n')
                 error = True
-        if not error:
-            return True
-        else:
-            return False
+        return not error
     return docker_push_callable
-        
 
 def get_file_dep(path):
     file_list = []
@@ -109,8 +103,11 @@ def get_file_dep(path):
 
 def parse_dodocker_yaml(mode):
     dep_groups = {}
-    with open('dodocker.yaml','r') as f:
-        yaml_data = yaml.safe_load(f)
+    try:
+        with open('dodocker.yaml','r') as f:
+            yaml_data = yaml.safe_load(f)
+    except IOError:
+        sys.exit('No dodocker.yaml found')
     for task_description in yaml_data:
         image = task_description['image']
 
@@ -213,8 +210,17 @@ def task_upload():
            'actions': None,
            'task_dep': all_upload_tasks}
 
+"""
+pretty print a dump of build tasks for debugging purposes
+"""
+def task_build_dump():
+    def build_dump():
+        from pprint import pprint
+        pprint(list(task_build()))
+    return {'actions':[build_dump],
+            'verbosity':2}
+
 def main():
     import doit
     doit.run(globals())
-    #    from pprint import pprint
-    #    pprint(list(task_build()))
+
