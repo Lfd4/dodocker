@@ -87,7 +87,7 @@ def docker_push(repository,tag):
             line_parsed = json.loads(line)
             if 'status' in line_parsed:
                 sys.stdout.write(line_parsed['status']+'\n')
-            if line.get('errorDetail') in line:
+            if line_parsed.get('errorDetail'):
                 sys.stdout.write(line_parsed['errorDetail']['message']+'\n')
                 error = True
         return not error
