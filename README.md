@@ -25,16 +25,14 @@ Such a entry defines the following fields:
 for shell actions:
 
 image: name of image
-taskname: a unique task name (soon to be obsolete) (mandatory)
 shell_action: "command to be exected" 
-depends: task name to depend upon (optional)
+depends: image name to depend upon (optional)
 tags: [tag1,tag2,...] (optional list of tags)
 
 for Dockerfiles:
 image: name of image
-taskname: a unique task name (soon to be obsolete) (mandatory)
 docker_build: true (mandatory for building a Dockerfile)
-depends: task name to depend upon (optional)
+depends: image name to depend upon (optional)
 path: /path/to/directory
 file_dep: [file1, file2, dir/file3, ...] (files to watch for changes, optional)
 dockerfile: optional dockerfile

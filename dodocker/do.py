@@ -20,8 +20,6 @@ class RegistryPath(object):
         (tmp,port) = path.rsplit(':')
         self.port = int(port)
 
-taskname_regexp = re.compile('^[a-zA-Z0-9 ._\-]+$')
-
 doc = docker.Client(base_url='unix://var/run/docker.sock',
                     version='1.17',
                     timeout=10)
@@ -118,10 +116,9 @@ def parse_dodocker_yaml(mode):
         else:
             tags = task_description['tags']
 
-        name = '%s_%s' % (mode, task_description['taskname'])
+        name = '%s_%s' % (mode, task_description['image'])
         path = task_description.get('path',None)
         dockerfile = task_description.get('dockerfile','Dockerfile')
-        assert taskname_regexp.match(name), 'invalid taskname %s' % name
         new_task = {'basename':name, 'verbosity':0}
         
         """ task dependencies
