@@ -6,6 +6,9 @@ this task file reads the task definition from dodocker.yaml
 """
 from __future__ import print_function
 
+CONFIG = {'registry_path': 'localhost:5000',
+          'insecure': True}
+
 DOIT_CONFIG = {'default_tasks': ['build']}
 
 
@@ -17,7 +20,7 @@ import subprocess
 doc = docker.Client(base_url='unix://var/run/docker.sock',
                     version='1.17',
                     timeout=10)
-registry = ''
+config = {}
 
 def image_id(image):
     def image_id_callable():
@@ -66,7 +69,7 @@ def docker_push(repository,tag):
         error = False
         print("push:",repository,tag)
         try:
-            result = doc.push(repository,stream=True,tag=tag)
+            result = doc.push(repository,stream=True,tag=tag,insecure_registry=config['insecure'])
         except docker.errors.DockerException as e:
             sys.exit(e)
         for line in result:
@@ -140,9 +143,9 @@ def parse_dodocker_yaml(mode):
             image_no_tag = image
             if ':' in image:
                 image_no_tag, tag = image.split(':')
-            new_task['actions'].append(docker_tag(image, '%s/%s' % (registry,image_no_tag),tag))
+            new_task['actions'].append(docker_tag(image, '%s/%s' % (config['registry_path'],image_no_tag),tag))
             for tag in tags:
-                new_task['actions'].append(docker_tag(image,'%s/%s' % (registry,image) ,tag=tag))
+                new_task['actions'].append(docker_tag(image,'%s/%s' % (config['registry_path'],image) ,tag=tag))
                 new_task['actions'].append(docker_tag(image,image ,tag=tag))
                    
             # IMPORTANT: image_id has to be the last action. The output of the last action is used for result_dep.
@@ -163,10 +166,10 @@ def parse_dodocker_yaml(mode):
             tag = None
             if ':' in image:
                 image, tag = image.split(':')
-            new_task['actions'] = [docker_push('%s/%s' % (registry,image), tag)]
+            new_task['actions'] = [docker_push('%s/%s' % (config['registry_path'],image), tag)]
             new_task['task_dep'].append('tagging_*')
             #for tag in tags:
-            #    new_task['actions'].append(docker_push(image,'%s/%s' % (registry,image)))
+            #    new_task['actions'].append(docker_push(image,'%s/%s' % (config['registry_path'],image)))
 
         yield new_task
     # Groups are not yet implemented
@@ -207,7 +210,7 @@ def load_config():
         except IOError:
             sys.exit('Failed to read {}'.format(path))
         return config
-    return {}
+    return CONFIG
     
 def save_config(config):
     try:
@@ -217,6 +220,18 @@ def save_config(config):
     except IOError:
         sys.exit('Failed to write {}'.format(path))
     
+def task_set_insecure():
+    def set_insecure(flag):
+        if flag[0] == 'yes':
+            flag = True
+        else:
+            flag = False
+        config = load_config()
+        config['insecure'] = flag
+        save_config(config)
+    return {'actions': [(set_insecure,)],
+            'pos_arg': 'flag'}
+
 def task_set_registry():
     def set_registry(pos):
         if not pos:
@@ -238,9 +253,8 @@ def task_build_dump():
             'verbosity':2}
 
 def main():
-    global registry
+    global config
     config = load_config()
-    registry = config['registry_path']
     import doit
     doit.run(globals())
 
