@@ -93,7 +93,6 @@ def get_file_dep(path):
     return file_list
 
 def parse_dodocker_yaml(mode):
-    dep_groups = {}
     try:
         with open('dodocker.yaml','r') as f:
             yaml_data = yaml.safe_load(f)
@@ -121,14 +120,6 @@ def parse_dodocker_yaml(mode):
             depends_subtask_name = task_description['depends']
             new_task['task_dep'] = ['%s_%s' % (mode,depends_subtask_name)]
 
-        """ groups (not working yet)
-        """
-        #if 'group' in task_description:
-        #    group = task_description['group']
-        #    if not group in dep_groups:
-        #        dep_groups[group] = []
-        #    dep_groups[group].append('build:'+name)
-        
         if mode == 'build':
             assert not(task_description.get('shell_action') and task_description.get('docker_build'))
             if 'shell_action' in task_description:
@@ -168,18 +159,7 @@ def parse_dodocker_yaml(mode):
                 image, tag = image.split(':')
             new_task['actions'] = [docker_push('%s/%s' % (config['registry_path'],image), tag)]
             new_task['task_dep'].append('tagging_*')
-            #for tag in tags:
-            #    new_task['actions'].append(docker_push(image,'%s/%s' % (config['registry_path'],image)))
-
         yield new_task
-    # Groups are not yet implemented
-    #for group in dep_groups.keys():
-    #    new_task = {
-    #        'basename': group,
-    #        'actions': None,
-    #        'task_dep': dep_groups[group]}
-    #    yield new_task
-
 
 def task_build():
     all_build_tasks = []
