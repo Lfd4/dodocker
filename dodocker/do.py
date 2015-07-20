@@ -7,22 +7,17 @@ this task file reads the task definition from dodocker.yaml
 from __future__ import print_function
 
 DOIT_CONFIG = {'default_tasks': ['build']}
-REGISTRY = 'dr.work.de:443'
+
 
 import os, yaml, json, sys, re, time
 from doit.tools import result_dep
 import docker
 import subprocess
 
-class RegistryPath(object):
-    def __init__(self,path):
-        self.path = path
-        (tmp,port) = path.rsplit(':')
-        self.port = int(port)
-
 doc = docker.Client(base_url='unix://var/run/docker.sock',
                     version='1.17',
                     timeout=10)
+registry = ''
 
 def image_id(image):
     def image_id_callable():
@@ -145,9 +140,9 @@ def parse_dodocker_yaml(mode):
             image_no_tag = image
             if ':' in image:
                 image_no_tag, tag = image.split(':')
-            new_task['actions'].append(docker_tag(image, '%s/%s' % (REGISTRY,image_no_tag),tag))
+            new_task['actions'].append(docker_tag(image, '%s/%s' % (registry,image_no_tag),tag))
             for tag in tags:
-                new_task['actions'].append(docker_tag(image,'%s/%s' % (REGISTRY,image) ,tag=tag))
+                new_task['actions'].append(docker_tag(image,'%s/%s' % (registry,image) ,tag=tag))
                 new_task['actions'].append(docker_tag(image,image ,tag=tag))
                    
             # IMPORTANT: image_id has to be the last action. The output of the last action is used for result_dep.
@@ -168,10 +163,10 @@ def parse_dodocker_yaml(mode):
             tag = None
             if ':' in image:
                 image, tag = image.split(':')
-            new_task['actions'] = [docker_push('%s/%s' % (REGISTRY,image), tag)]
+            new_task['actions'] = [docker_push('%s/%s' % (registry,image), tag)]
             new_task['task_dep'].append('tagging_*')
             #for tag in tags:
-            #    new_task['actions'].append(docker_push(image,'%s/%s' % (REGISTRY,image)))
+            #    new_task['actions'].append(docker_push(image,'%s/%s' % (registry,image)))
 
         yield new_task
     # Groups are not yet implemented
@@ -203,6 +198,35 @@ def task_upload():
            'actions': None,
            'task_dep': all_upload_tasks}
 
+def load_config():
+    path = os.path.expanduser('~/.dodocker.yaml')
+    if os.path.exists(path):
+        try:
+            with open(path,'r') as f:
+                config = yaml.safe_load(f.read())
+        except IOError:
+            sys.exit('Failed to read {}'.format(path))
+        return config
+    return {}
+    
+def save_config(config):
+    try:
+        path = os.path.expanduser('~/.dodocker.yaml')
+        with open(path,'w') as f:
+            f.write(yaml.safe_dump(config))
+    except IOError:
+        sys.exit('Failed to write {}'.format(path))
+    
+def task_set_registry():
+    def set_registry(pos):
+        if not pos:
+            sys.exit('Error: please give a registry path (i.e. your.reg.com:443)')
+        config = load_config()
+        config['registry_path'] = pos[0]
+        save_config(config)
+    return {'actions': [(set_registry,)],
+            'pos_arg': 'pos'}
+    
 """
 pretty print a dump of build tasks for debugging purposes
 """
@@ -214,6 +238,9 @@ def task_build_dump():
             'verbosity':2}
 
 def main():
+    global registry
+    config = load_config()
+    registry = config['registry_path']
     import doit
     doit.run(globals())
 
