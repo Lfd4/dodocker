@@ -39,6 +39,25 @@ for Dockerfiles:
     dockerfile: optional dockerfile
     tags: [tag1,tag2,...] (optional list of tags)
 
+Building images
+===============
+
+Inside the directory that carries the dodocker.yaml file type:
+
+    $ dodocker
+
+This will call the default `build` task to be run. If a build sub-task errors out, the stdout
+from this build is sent to stdout. If you like to generally see the output of your builds, it is
+possible to raise verbosity which is a feature of doit.
+
+    $ dodocker --verbosity 2
+
+Likewise it is possible to build images in parallel. Although there seems to be a race condition
+within docker to make a build fail from time to time, when running in parallel. This will run
+4 build processes in parallel.
+
+    $ dodocker -n 4
+
 Uploading to a private registry
 ===============================
 
@@ -55,3 +74,11 @@ switch it back to secure only:
 
     $ dodocker set_insecure no
 
+Settings are saved in ~/.dodocker.yaml.
+
+To upload 
+
+A working example
+=================
+
+in the directory ´example´
