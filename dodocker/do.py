@@ -24,13 +24,6 @@ doc = docker.Client(base_url='unix://var/run/docker.sock',
                     version='1.17',
                     timeout=10)
 
-def git_build_count(path):
-    orig_path = os.getcwd()
-    os.chdir(path)
-    buildnr = int(subprocess.check_output(['git','rev-list','HEAD','--count']))
-    os.chdir(orig_path)
-    return buildnr
-
 def image_id(image):
     def image_id_callable():
         try:
