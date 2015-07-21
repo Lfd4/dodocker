@@ -1,0 +1,32 @@
+- image: ubuntu-base:14.04
+  group: ubuntu_group
+  shell_action: "sudo images/baseimages/mkimage.sh -t ubuntu-base:14.04 debootstrap --include=ubuntu-minimal trusty http://archive.ubuntu.com/ubuntu/"
+
+- image: ubuntu:14.04
+  depends: ubuntu-base:14.04
+  group: ubuntu_group
+  path: images/baseimages/ubuntu
+  file_dep: [Dockerfile,sources.list]
+  docker_build: true
+
+- image: debian-base:jessie
+  group: debian_group
+  shell_action: "sudo images/baseimages/mkimage.sh -t debian-base:jessie debootstrap --variant=minbase jessie http://ftp.debian.org/debian"
+
+- image: debian-base:wheezy
+  group: debian_group
+  shell_action: "sudo images/baseimages/mkimage.sh -t debian-base:wheezy debootstrap --variant=minbase wheezy http://ftp.debian.org/debian"
+
+- image: debian:jessie
+  path: images/baseimages/debian/jessie
+  group: debian_group
+  depends: debian-base:jessie
+  docker_build: true
+  file_dep: [Dockerfile]
+
+- image: debian:wheezy
+  path: images/baseimages/debian/wheezy
+  group: debian_group
+  depends: debian-base:wheezy
+  docker_build: true
+  file_dep: [Dockerfile]
