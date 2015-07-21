@@ -44,11 +44,11 @@ def check_available(image):
         return True
     return check_available_callable
 
-def docker_build(path,tag,dockerfile):
+def docker_build(path,tag,dockerfile,pull=False):
     def docker_build_callable():
         error = False
         print(path,tag)
-        for line in doc.build(path,tag=tag,rm=True,stream=True,pull=True,dockerfile=dockerfile):
+        for line in doc.build(path,tag=tag,rm=True,stream=True,pull=pull,dockerfile=dockerfile):
             line_parsed = json.loads(line)
             if 'stream' in line_parsed:
                 sys.stdout.write(line_parsed['stream'].encode('utf8'))
@@ -126,7 +126,8 @@ def parse_dodocker_yaml(mode):
                 new_task['actions'] = [task_description['shell_action']]
             if 'docker_build' in task_description:
                 assert path
-                new_task['actions'] = [docker_build(path,tag=image,dockerfile=dockerfile)]
+                pull = task_description.get('pull',False)
+                new_task['actions'] = [docker_build(path,tag=image,dockerfile=dockerfile,pull=pull)]
 
 
             # tagging

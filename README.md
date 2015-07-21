@@ -37,6 +37,7 @@ for Dockerfiles:
     path: /path/to/directory
     file_dep: [file1, file2, dir/file3, ...] (files to watch for changes, optional)
     dockerfile: optional dockerfile
+    pull: force a pull for dependant image (optional, default is false. valid when docker_build is true)
     tags: [tag1,tag2,...] (optional list of tags)
 
 Building images
