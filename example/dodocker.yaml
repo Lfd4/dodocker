@@ -17,10 +17,10 @@
   path: images/baseimages/debian/jessie
   depends: debian-base:jessie
   docker_build: true
-  file_dep: [Dockerfile]
+  file_dep: [Dockerfile,sources.list]
 
 - image: debian:wheezy
   path: images/baseimages/debian/wheezy
   depends: debian-base:wheezy
   docker_build: true
-  file_dep: [Dockerfile]
+  file_dep: [Dockerfile,sources.list]
