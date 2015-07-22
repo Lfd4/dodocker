@@ -37,7 +37,7 @@ for Dockerfiles:
     path: /path/to/directory
     file_dep: [file1, file2, dir/file3, ...] (files to watch for changes, optional)
     dockerfile: optional dockerfile
-    pull: force a pull for dependant image (optional, default is false. valid when docker_build is true)
+    pull: force a pull for dependant [remote] image (optional, default is false. available when docker_build is true)
     tags: [tag1,tag2,...] (optional list of tags)
 
 Building images
@@ -49,13 +49,14 @@ Inside the directory that carries the dodocker.yaml file type:
 
 This will call the default `build` task to be run. If a build sub-task errors out, the stdout
 from this build is sent to stdout. If you like to generally see the output of your builds, it is
-possible to raise verbosity which is a feature of doit.
+possible to get this verbosity by using the flag provided by doit.
 
     $ dodocker --verbosity 2
 
-Likewise it is possible to build images in parallel. Although there seems to be a race condition
-within docker to make a build fail from time to time, when running in parallel. This will run
-4 build processes in parallel.
+Likewise it is possible to build images in parallel. A warning though: There seems to be a race
+condition within docker to make a build fail from time to time, when running in parallel.
+Restarting the build will finish the build eventually.
+This will run 4 build processes in parallel:
 
     $ dodocker -n 4
 
