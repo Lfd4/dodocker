@@ -84,12 +84,19 @@ To upload:
 
 Now you have your images inside your private registry.
 
-Create an environment for building your own base images
-=======================================================
+Environment for building your own base images
+=============================================
+
+You have two options:
+
+1. Build your own environment
 
 Please consulte the README.md file in the example directory. This is a complete setup and starting
-point for building your own Debian and Ubuntu base images. It is based on the mkimage tool
-courtesy of the docker project.
+point for creating an environment for building your own Debian and Ubuntu base images.
+
+2. Build a Docker image and have a ready setup in minutes
+
+Just run a `docker build -t dodocker .` inside the dodocker directory. 
 
 
 
