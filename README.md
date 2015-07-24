@@ -98,5 +98,6 @@ point for creating an environment for building your own Debian and Ubuntu base i
 
 Just run a `docker build -t dodocker .` inside the dodocker directory. 
 
-
+When built you can execute a build with:
+docker run -v /var/run/docker.sock:/var/run/docker.sock -ti --rm dodocker
 
