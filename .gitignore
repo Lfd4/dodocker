@@ -6,3 +6,4 @@ bin/*
 lib/*
 include/*
 *.egg-info
+example/.doit.db
