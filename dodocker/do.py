@@ -134,11 +134,17 @@ def parse_dodocker_yaml(mode):
             new_task['task_dep'] = ['%s_%s' % (mode,depends_subtask_name)]
 
         if mode == 'build':
-            assert not(task_description.get('shell_action') and task_description.get('docker_build'))
-            if 'shell_action' in task_description:
-                new_task['actions'] = [task_description['shell_action']]
-            if 'docker_build' in task_description:
-                assert path
+            task_type = task_description.get('type','dockerfile')
+            if task_type not in ('dockerfile','shell'):
+                sys.exit('Image {}: unknown type {}'.format(image, task_type))
+            if task_type == 'shell':
+                if 'shell_action' in task_description:
+                    new_task['actions'] = [task_description['shell_action']]
+                else:
+                    sys.exit('Image {}: shell_action missing for build type shell'.format(image))
+            elif task_type == 'dockerfile':
+                if not path:
+                    sys.exit('Image {}: path missing for build type shell'.format(image))
                 pull = task_description.get('pull',False)
                 new_task['actions'] = [docker_build(path,tag=image,dockerfile=dockerfile,pull=pull)]
 
