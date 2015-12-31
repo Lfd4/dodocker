@@ -29,6 +29,7 @@ import os, yaml, json, sys, re, time
 from doit.tools import result_dep
 import docker
 import subprocess
+import git
 
 doc = docker.Client(base_url='unix://var/run/docker.sock',
                     version='1.17',
@@ -114,13 +115,8 @@ def parse_dodocker_yaml(mode):
     for task_description in yaml_data:
         image = task_description['image']
 
-        if not 'tags' in task_description:
-            tags = []
-        else:
-            tags = task_description['tags']
-
         name = '%s_%s' % (mode, task_description['image'])
-        path = task_description.get('path',None)
+        path = str(task_description.get('path',None))
         dockerfile = task_description.get('dockerfile','Dockerfile')
         new_task = {'basename':name, 'verbosity':0}
         
@@ -132,6 +128,14 @@ def parse_dodocker_yaml(mode):
         if 'depends' in task_description:
             depends_subtask_name = task_description['depends']
             new_task['task_dep'] = ['%s_%s' % (mode,depends_subtask_name)]
+
+        if mode == 'git':
+            if git_url in task_description:
+                #git_checkout(task_description['git_url'],
+                #             task_description['git_checkout'])
+                print("nyi")
+            else:
+                continue
 
         if mode == 'build':
             task_type = task_description.get('type','dockerfile')
@@ -150,6 +154,10 @@ def parse_dodocker_yaml(mode):
                 new_task['actions'] = [docker_build(path,tag=image,dockerfile=dockerfile,pull=pull,rm=rm)]
 
             # tagging
+            if not 'tags' in task_description:
+                tags = []
+            else:
+                tags = task_description['tags']
             tag = None
             image_no_tag = image
             if ':' in image:
@@ -178,8 +186,17 @@ def parse_dodocker_yaml(mode):
             if ':' in image:
                 image, tag = image.split(':')
             new_task['actions'] = [docker_push('%s/%s' % (config['registry_path'],image), tag)]
-            new_task['task_dep'].append('tagging_*')
         yield new_task
+
+def task_git():
+    all_build_tasks = []
+    for task in parse_dodocker_yaml('git'):
+        all_build_tasks.append(task['basename'])
+        yield task
+    if all_build_tasks:
+        yield {'basename':'git',
+               'actions': None,
+               'task_dep': all_build_tasks}
 
 def task_build():
     all_build_tasks = []
