@@ -25,7 +25,7 @@ CONFIG = {'registry_path': 'localhost:5000',
 DOIT_CONFIG = {'default_tasks': ['build']}
 
 
-import os, yaml, json, sys, re, time
+import os, yaml, json, sys, re, time, hashlib
 from doit.tools import result_dep
 import docker
 import subprocess
@@ -106,6 +106,35 @@ def get_file_dep(path):
             file_list.append(os.path.join(root,i))
     return file_list
 
+def git_repos_path(url):
+    return "dodocker_repos/{}".format(hashlib.md5(url).hexdigest())
+
+def update_git(git_url,git_checkout):
+    checkout_type = checkout = None
+    if git_checkout:
+        try:
+            (checkout_type, checkout) = git_checkout.split('/')
+        except ValueError:
+            pass
+        if not checkout_type in ('branch','tag','commit'):
+            sys.exit('wrong format of git_checkout {} for url {}'.format(git_checkout,git_url))
+    else:
+        checkout_type='branch'
+        checkout='master'
+    def update_git_callable():
+        error = False
+        path = git_repos_path(git_url)
+        if os.path.exists(path):
+            repository = git.Repo(path)
+            response = repository.git.pull()
+            print("git pull on {}".format(git_url))
+            print(response)
+        else:
+            repository = git.Repo.clone_from(git_url,path)
+            print("done git clone {}".format(git_url))
+        return not error
+    return update_git_callable
+
 def parse_dodocker_yaml(mode):
     try:
         with open('dodocker.yaml','r') as f:
@@ -127,18 +156,21 @@ def parse_dodocker_yaml(mode):
 
         if 'depends' in task_description:
             depends_subtask_name = task_description['depends']
-            new_task['task_dep'] = ['%s_%s' % (mode,depends_subtask_name)]
+            new_task['task_dep'].append('{}_{}'.format(mode,depends_subtask_name))
 
         if mode == 'git':
             if 'git_url' in task_description:
-                #git_checkout(task_description['git_url'],
-                #             task_description['git_checkout'])
-                print("nyi")
+                new_task['actions']=[
+                    update_git(task_description['git_url'],
+                               task_description['git_checkout'])]
             else:
                 continue
 
-        if mode == 'build':
+        elif mode == 'build':
             task_type = task_description.get('type','dockerfile')
+            if 'git_url' in task_description:
+                new_task['task_dep'].append('git_{}'.format(image))
+                path = "{}/{}".format(git_repos_path(task_description['git_url']),path)
             if task_type not in ('dockerfile','shell'):
                 sys.exit('Image {}: unknown type {}'.format(image, task_type))
             if task_type == 'shell':
