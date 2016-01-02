@@ -25,7 +25,7 @@ CONFIG = {'registry_path': 'localhost:5000',
 DOIT_CONFIG = {'default_tasks': ['build']}
 
 
-import os, yaml, json, sys, re, time, hashlib
+import os, yaml, json, sys, re, time, hashlib, argparse
 from doit.tools import result_dep
 import docker
 import subprocess
@@ -106,31 +106,32 @@ def get_file_dep(path):
             file_list.append(os.path.join(root,i))
     return file_list
 
-def git_repos_path(url):
-    return "dodocker_repos/{}".format(hashlib.md5(url).hexdigest())
+def git_repos_path(url,checkout_type, checkout):
+    return "dodocker_repos/{}".format(hashlib.md5(".".join((url,checkout_type,checkout))).hexdigest())
 
-def update_git(git_url,git_checkout):
-    checkout_type = checkout = None
-    if git_checkout:
-        try:
-            (checkout_type, checkout) = git_checkout.split('/')
-        except ValueError:
-            pass
-        if not checkout_type in ('branch','tag','commit'):
-            sys.exit('wrong format of git_checkout {} for url {}'.format(git_checkout,git_url))
-    else:
-        checkout_type='branch'
-        checkout='master'
+def update_git(git_url, checkout_type, checkout):
     def update_git_callable():
         error = False
-        path = git_repos_path(git_url)
+        path = git_repos_path(git_url,checkout_type,checkout)
         if os.path.exists(path):
+            if checkout_type in ('commit','tags'):
+                # commit and tags don't change
+                return not error
             repository = git.Repo(path)
-            response = repository.git.pull()
-            print("git pull on {}".format(git_url))
-            print(response)
+            try:
+                response = repository.git.pull()
+            except git.GitCommandError:
+                error = True
+                print ("error on pull for {} {}/{}".format(git_url,checkout_type,checkout))
+            else:
+                print("git pull on {}".format(git_url))
+                print(response)
         else:
             repository = git.Repo.clone_from(git_url,path)
+            if checkout_type in ('branch', 'commit'):
+                repository.git.checkout(checkout)
+            elif checkout_type == 'tags':
+                repository.git.checkout('tags/{}'.format(checkout))
             print("done git clone {}".format(git_url))
         return not error
     return update_git_callable
@@ -148,7 +149,21 @@ def parse_dodocker_yaml(mode):
         path = str(task_description.get('path',None))
         dockerfile = task_description.get('dockerfile','Dockerfile')
         new_task = {'basename':name, 'verbosity':0}
-        
+        git_url = git_checkout = git_checkout_type = None
+        git_options = task_description.get('git_url',"").split()
+        if git_options:
+            git_url = git_options[0]
+            if len(git_options) == 2:
+                try:
+                    (git_checkout_type, git_checkout) = git_options[1].split('/')
+                except ValueError:
+                    pass
+                if not git_checkout_type in ('branch','tags','commit'):
+                    sys.exit('wrong tree format {} for url {}'.format(git_options[1],git_url))
+            else:
+                git_checkout_type = 'branch'
+                git_checkout = 'master'
+
         """ task dependencies
         """
         new_task['uptodate'] = []
@@ -160,17 +175,17 @@ def parse_dodocker_yaml(mode):
 
         if mode == 'git':
             if 'git_url' in task_description:
-                new_task['actions']=[
-                    update_git(task_description['git_url'],
-                               task_description['git_checkout'])]
+                new_task['actions']=[update_git(git_url,
+                                                git_checkout_type,
+                                                git_checkout)]
             else:
                 continue
 
         elif mode == 'build':
             task_type = task_description.get('type','dockerfile')
-            if 'git_url' in task_description:
+            if git_url:
                 new_task['task_dep'].append('git_{}'.format(image))
-                path = "{}/{}".format(git_repos_path(task_description['git_url']),path)
+                path = "{}/{}".format(git_repos_path(git_url,git_checkout_type,git_checkout),path)
             if task_type not in ('dockerfile','shell'):
                 sys.exit('Image {}: unknown type {}'.format(image, task_type))
             if task_type == 'shell':
@@ -302,34 +317,52 @@ def task_build_dump():
             'verbosity':2}
 
 import doit
+LICENSE_TEXT = """
+dodocker (c) 2014-2016 n@work Internet Informationssysteme GmbH
+based on doit by Eduardo Schettino.
 
-HELP_TEXT = """
-   dodocker help
-   
-   build images: dodocker
-   upload images: dodocker upload
-   set registry: dodocker set_registry registry.yourdomain.com:443
-   set insecure registry: dodocker set_insecure yes/no
-
-   dodocker (c) 2014-2016 n@work Internet Informationssysteme GmbH
-   based on doit by Eduardo Schettino.
-
-   This program comes with ABSOLUTELY NO WARRANTY
-   This is free software, and you are welcome to redistribute it
-   under certain conditions. See this link for more information:
-   http://www.gnu.org/licenses/gpl-3.0.en.html
+This program comes with ABSOLUTELY NO WARRANTY
+This is free software, and you are welcome to redistribute it
+under certain conditions. See this link for more information:
+http://www.gnu.org/licenses/gpl-3.0.en.html
 
 """
 
-def dodocker_help_usage(cmd):
-    print(HELP_TEXT)
-    doit.cmd_help.Help.print_usage_orig(cmd)
-    
+def process_args(parsed,unparsed):
+    global config
+    sys.argv = [sys.argv[0]]
+    if parsed.subcommand in ('build','upload'):
+        if parsed.targets:
+            for target in parsed.targets:
+                sys.argv.append("{}_{}".format(parsed.subcommand, target))
+        else:
+            sys.argv.append(parsed.subcommand)
+    elif parsed.subcommand == 'doit':
+        sys.argv.extend(unparsed)
+
 def main():
     global config
+    parser = argparse.ArgumentParser(epilog=LICENSE_TEXT,
+                                     formatter_class=argparse.RawTextHelpFormatter)
+    subparsers = parser.add_subparsers(
+        title='sub-commands of dodocker',
+        description='dodocker is devided into sub-commands. Please refer to their help.',
+        dest='subcommand',
+        help='sub-command help')
+    build_parser = subparsers.add_parser(
+        'build',
+        help='build all or selected dodocker targets')
+    build_parser.add_argument('targets',metavar='target',nargs='*',help="list of targets to build")
+    upload_parser = subparsers.add_parser(
+        'upload',
+        help='upload built images to registry')
+    upload_parser.add_argument('targets',metavar='target',nargs='*',help="list of targets to upload")
+    doit_parser = subparsers.add_parser(
+        'doit',
+        help='pass raw doit commands')
+        
+    parsed = parser.parse_known_args()
+    process_args(*parsed)
     config = load_config()
-    # monkey patch for dodocker specific usage help
-    doit.cmd_help.Help.print_usage_orig = staticmethod(doit.cmd_help.Help.print_usage)
-    doit.cmd_help.Help.print_usage = staticmethod(dodocker_help_usage)
     doit.run(globals())
 
