@@ -5,9 +5,9 @@ dodocker
 Overview
 ========
 
-dodocker is a build and registry upload tool for docker images. It is based upon 
-[doit task management & automation tool](http://pydoit.org/). It reads a dodocker.yaml task
-definition file and can run Dockerfiles as well as shell scripts. 
+dodocker is a dependency based build tool for docker images. It supports uploading 
+built images to a private registry. It is based upon [doit task management & automation tool](http://pydoit.org/). 
+The build configuration is provided by a very simple to use yaml file.
 
 dodocker was especially conceived to build docker images from scratch without the need to
 use images from docker.com registry. Nevertheless it is possible to base your builds on
@@ -38,6 +38,7 @@ for Dockerfiles:
     file_dep: [file1, file2, dir/file3, ...] (files to watch for changes, optional)
     dockerfile: optional dockerfile
     pull: force a pull for dependant [remote] image (optional, default is false. available when docker_build is true)
+    rm: remove intermediate containers after successful build (true (default)/false) 
     tags: [tag1,tag2,...] (optional list of tags)
 
 Building images
