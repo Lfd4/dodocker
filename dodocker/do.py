@@ -142,7 +142,6 @@ def parse_dodocker_yaml(mode):
                 pull = task_description.get('pull',False)
                 new_task['actions'] = [docker_build(path,tag=image,dockerfile=dockerfile,pull=pull)]
 
-
             # tagging
             tag = None
             image_no_tag = image
@@ -246,9 +245,35 @@ def task_build_dump():
     return {'actions':[build_dump],
             'verbosity':2}
 
+import doit
+
+HELP_TEXT = """
+   dodocker help
+   
+   build images: dodocker
+   upload images: dodocker upload
+   set registry: dodocker set_registry registry.yourdomain.com:443
+   set insecure registry: dodocker set_insecure yes/no
+
+   dodocker (c) 2014-2016 n@work Internet Informationssysteme GmbH
+   based on doit by Eduardo Schettino.
+
+   This program comes with ABSOLUTELY NO WARRANTY
+   This is free software, and you are welcome to redistribute it
+   under certain conditions. See this link for more information:
+   http://www.gnu.org/licenses/gpl-3.0.en.html
+
+"""
+
+def dodocker_help_usage(cmd):
+    print(HELP_TEXT)
+    doit.cmd_help.Help.print_usage_orig(cmd)
+    
 def main():
     global config
     config = load_config()
-    import doit
+    # monkey patch for dodocker specific usage help
+    doit.cmd_help.Help.print_usage_orig = staticmethod(doit.cmd_help.Help.print_usage)
+    doit.cmd_help.Help.print_usage = staticmethod(dodocker_help_usage)
     doit.run(globals())
 
