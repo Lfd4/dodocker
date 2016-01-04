@@ -144,7 +144,7 @@ def parse_dodocker_yaml(mode):
                     sys.exit('Image {}: shell_action missing for build type shell'.format(image))
             elif task_type == 'dockerfile':
                 if not path:
-                    sys.exit('Image {}: path missing for build type shell'.format(image))
+                    sys.exit('Image {}: path missing for build type dockerfile'.format(image))
                 pull = task_description.get('pull',False)
                 rm = task_description.get('rm',True)
                 new_task['actions'] = [docker_build(path,tag=image,dockerfile=dockerfile,pull=pull,rm=rm)]
