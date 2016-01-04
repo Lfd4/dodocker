@@ -2,7 +2,7 @@
 #   ___/ /__  / _ \___  ____/ /_____ ____
 #  / _  / _ \/ // / _ \/ __/  '_/ -_) __/
 #  \_,_/\___/____/\___/\__/_/\_\\__/_/
-#  doDocker (c) 2014-2015 Andreas Elvers
+#  doDocker (c) 2014-2016 Andreas Elvers
 #  n@work Internet Informationssysteme GmbH
 #
 #  doDocker is based upon pydoit.org 
