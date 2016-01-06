@@ -130,7 +130,7 @@ def parse_dodocker_yaml(mode):
             new_task['task_dep'] = ['%s_%s' % (mode,depends_subtask_name)]
 
         if mode == 'git':
-            if git_url in task_description:
+            if 'git_url' in task_description:
                 #git_checkout(task_description['git_url'],
                 #             task_description['git_checkout'])
                 print("nyi")
