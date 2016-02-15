@@ -5,7 +5,6 @@
   depends: ubuntu-base:14.04
   path: images/baseimages/ubuntu
   file_dep: [Dockerfile,sources.list]
-  docker_build: true
 
 - image: debian-base:jessie
   shell_action: "sudo images/baseimages/docker-mkimage/mkimage.sh -t debian-base:jessie debootstrap --variant=minbase jessie http://ftp.debian.org/debian"
@@ -16,11 +15,9 @@
 - image: debian:jessie
   path: images/baseimages/debian/jessie
   depends: debian-base:jessie
-  docker_build: true
   file_dep: [Dockerfile,sources.list]
 
 - image: debian:wheezy
   path: images/baseimages/debian/wheezy
   depends: debian-base:wheezy
-  docker_build: true
   file_dep: [Dockerfile,sources.list]
