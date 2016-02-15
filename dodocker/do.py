@@ -19,14 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import print_function
 
-CONFIG = {'registry_path': 'localhost:5000',
-          'insecure': True}
+DEFAULT_DODOCKER_CONFIG = {'registry_path' : 'localhost:5000',
+                           'insecure'      : True}
 
 DOIT_CONFIG = {'default_tasks': ['build']}
 
+dodocker_config_path = '.dodocker.cfg'
 
 import os, yaml, json, sys, re, time, hashlib, argparse
-from doit.tools import result_dep
+from doit.tools import result_dep, run_once
 import docker
 import subprocess
 import git
@@ -34,7 +35,7 @@ import git
 doc = docker.Client(base_url='unix://var/run/docker.sock',
                     version='1.17',
                     timeout=10)
-config = {}
+dodocker_config = {}
 
 def image_id(image):
     def image_id_callable():
@@ -62,7 +63,8 @@ def docker_build(path,tag,dockerfile,pull=False,rm=True):
     def docker_build_callable():
         error = False
         print(path,tag)
-        for line in doc.build(path,tag=tag,stream=True,pull=pull,dockerfile=dockerfile,rm=rm):
+        for line in doc.build(path,tag=tag,stream=True,pull=pull,dockerfile=dockerfile,
+                              rm=rm,nocache=dodocker_config.get('no_cache',False)):
             line_parsed = json.loads(line)
             if 'stream' in line_parsed:
                 sys.stdout.write(line_parsed['stream'].encode('utf8'))
@@ -70,6 +72,15 @@ def docker_build(path,tag,dockerfile,pull=False,rm=True):
                 sys.stdout.write(line_parsed['errorDetail']['message']+'\n')
                 error = True
         return not error
+    return docker_build_callable
+
+def shell_build(shell_cmd,image,force=False):
+    def docker_build_callable():
+        print(shell_cmd,image)
+        if not force and check_available(image):
+            return True
+        p = subprocess.Popen([shell_cmd],stdout=sys.stdout,stderr=sys.stderr,shell=True)
+        return p.wait() == 0
     return docker_build_callable
 
 def docker_tag(image,repository,tag=None):
@@ -169,7 +180,7 @@ def parse_dodocker_yaml(mode):
         new_task['uptodate'] = []
         new_task['task_dep'] = []
 
-        if 'depends' in task_description:
+        if 'depends' in task_description and mode in ('build','upload'):
             depends_subtask_name = task_description['depends']
             new_task['task_dep'].append('{}_{}'.format(mode,depends_subtask_name))
 
@@ -182,17 +193,15 @@ def parse_dodocker_yaml(mode):
                 continue
 
         elif mode == 'build':
-            task_type = task_description.get('type','dockerfile')
+            if 'shell_action' in task_description:
+                task_type = 'shell'
+            else:
+                task_type = 'dockerfile'
             if git_url:
                 new_task['task_dep'].append('git_{}'.format(image))
                 path = "{}/{}".format(git_repos_path(git_url,git_checkout_type,git_checkout),path)
-            if task_type not in ('dockerfile','shell'):
-                sys.exit('Image {}: unknown type {}'.format(image, task_type))
             if task_type == 'shell':
-                if 'shell_action' in task_description:
-                    new_task['actions'] = [task_description['shell_action']]
-                else:
-                    sys.exit('Image {}: shell_action missing for build type shell'.format(image))
+                new_task['actions'] = [shell_build(task_description['shell_action'],image)]
             elif task_type == 'dockerfile':
                 if not path:
                     sys.exit('Image {}: path missing for build type dockerfile'.format(image))
@@ -209,9 +218,11 @@ def parse_dodocker_yaml(mode):
             image_no_tag = image
             if ':' in image:
                 image_no_tag, tag = image.split(':')
-            new_task['actions'].append(docker_tag(image, '%s/%s' % (config['registry_path'],image_no_tag),tag))
+            new_task['actions'].append(docker_tag(
+                image, '%s/%s' % (dodocker_config['registry_path'],image_no_tag),tag))
             for tag in tags:
-                new_task['actions'].append(docker_tag(image,'%s/%s' % (config['registry_path'],image) ,tag=tag))
+                new_task['actions'].append(docker_tag(
+                    image,'%s/%s' % (dodocker_config['registry_path'],image) ,tag=tag))
                 new_task['actions'].append(docker_tag(image,image ,tag=tag))
                    
             # IMPORTANT: image_id has to be the last action. The output of the last action is used for result_dep.
@@ -226,13 +237,19 @@ def parse_dodocker_yaml(mode):
             if 'depends' in task_description:
                 new_task['uptodate'].append(result_dep('%s_%s' % (mode,depends_subtask_name)))
 
-            new_task['uptodate'].append(check_available(image))
-
+            if dodocker_config.get('no_cache') and image in dodocker_config['no_cache_targets']:
+                # the image is not up to date, when the cache is disabled by the user
+                new_task['uptodate'].append(lambda x=None: False)
+            else:
+                # an image has to be available
+                new_task['uptodate'].append(check_available(image))
+            # every task has to run once to build the result_dep chain for every image
+            new_task['uptodate'].append(run_once)
         elif mode == 'upload':
             tag = None
             if ':' in image:
                 image, tag = image.split(':')
-            new_task['actions'] = [docker_push('%s/%s' % (config['registry_path'],image), tag)]
+            new_task['actions'] = [docker_push('%s/%s' % (dodocker_config['registry_path'],image), tag)]
         yield new_task
 
 def task_git():
@@ -265,46 +282,6 @@ def task_upload():
            'actions': None,
            'task_dep': all_upload_tasks}
 
-def load_config():
-    path = os.path.expanduser('~/.dodocker.yaml')
-    if os.path.exists(path):
-        try:
-            with open(path,'r') as f:
-                config = yaml.safe_load(f.read())
-        except IOError:
-            sys.exit('Failed to read {}'.format(path))
-        return config
-    return CONFIG
-    
-def save_config(config):
-    try:
-        path = os.path.expanduser('~/.dodocker.yaml')
-        with open(path,'w') as f:
-            f.write(yaml.safe_dump(config))
-    except IOError:
-        sys.exit('Failed to write {}'.format(path))
-    
-def task_set_insecure():
-    def set_insecure(flag):
-        if flag[0] == 'yes':
-            flag = True
-        else:
-            flag = False
-        config = load_config()
-        config['insecure'] = flag
-        save_config(config)
-    return {'actions': [(set_insecure,)],
-            'pos_arg': 'flag'}
-
-def task_set_registry():
-    def set_registry(pos):
-        if not pos:
-            sys.exit('Error: please give a registry path (i.e. your.reg.com:443)')
-        config = load_config()
-        config['registry_path'] = pos[0]
-        save_config(config)
-    return {'actions': [(set_registry,)],
-            'pos_arg': 'pos'}
     
 """
 pretty print a dump of build tasks for debugging purposes
@@ -319,7 +296,7 @@ def task_build_dump():
 import doit
 LICENSE_TEXT = """
 dodocker (c) 2014-2016 n@work Internet Informationssysteme GmbH
-based on doit by Eduardo Schettino.
+written by Andreas Elvers - based on doit by Eduardo Schettino.
 
 This program comes with ABSOLUTELY NO WARRANTY
 This is free software, and you are welcome to redistribute it
@@ -328,22 +305,80 @@ http://www.gnu.org/licenses/gpl-3.0.en.html
 
 """
 
+def load_dodocker_config():
+    if os.path.exists(dodocker_config_path):
+        try:
+            with open(dodocker_config_path,'r') as f:
+                config = yaml.safe_load(f.read())
+        except IOError:
+            sys.exit('Failed to read {}'.format(dodocker_config_path))
+        return config
+    return DEFAULT_DODOCKER_CONFIG
+    
+def save_dodocker_config(config):
+    try:
+        with open(path,'w') as f:
+            f.write(yaml.safe_dump(config))
+    except IOError:
+        sys.exit('Failed to write {}'.format(path))
+    
+def config_set(key,value):
+    if not key in DEFAULT_DODOCKER_CONFIG.keys():
+        sys.exit('error: config knows these keys: {}'.format(" ".join(CONFIG.keys())))
+    config = load_dodocker_config()
+    config[key] = value
+    save_dodocker_config(config)
+
+def config_list():
+    config = load_dodocker_config()
+    for key in config:
+        print('{} : {}'.format(key,config[key]))
+
 def process_args(parsed,unparsed):
-    global config
+    if parsed.yamldir:
+        os.chdir(parsed.yamldir)
     sys.argv = [sys.argv[0]]
+    if parsed.subcommand == 'build':
+        if parsed.verbose:
+            sys.argv.extend(('--verbosity','2'))
+        if parsed.parallel:
+            sys.argv.extend(('-n',str(parsed.parallel[0])))
     if parsed.subcommand in ('build','upload'):
         if parsed.targets:
+            
             for target in parsed.targets:
                 sys.argv.append("{}_{}".format(parsed.subcommand, target))
         else:
             sys.argv.append(parsed.subcommand)
+    if parsed.subcommand == 'build' and parsed.no_cache:
+        dodocker_config['no_cache'] = True
+        if parsed.targets:
+            dodocker_config['no_cache_targets'] = parsed.targets
+
     elif parsed.subcommand == 'doit':
         sys.argv.extend(unparsed)
+    elif parsed.subcommand == 'config':
+        if parsed.config_mode == 'list':
+            config_list()
+        elif parsed.set_secure:
+            config_set('insecure',False)
+        elif parsed.set_insecure:
+            config_set('insecure',True)
+        elif parsed.set_registry_path:
+            config_set('registry_path', parsed.set_registry_path)
+        sys.exit(0)
 
 def main():
-    global config
+    global dodocker_config
     parser = argparse.ArgumentParser(epilog=LICENSE_TEXT,
                                      formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-c', dest='configfile',
+                        metavar='config file',
+                        help='use this docker config file')
+    parser.add_argument('-d', dest='yamldir',
+                        metavar='directory',
+                        help='this directory contains the dodocker.yaml file')
+    
     subparsers = parser.add_subparsers(
         title='sub-commands of dodocker',
         description='dodocker is devided into sub-commands. Please refer to their help.',
@@ -352,17 +387,31 @@ def main():
     build_parser = subparsers.add_parser(
         'build',
         help='build all or selected dodocker targets')
-    build_parser.add_argument('targets',metavar='target',nargs='*',help="list of targets to build")
+    build_parser.add_argument('-v','--verbose',action='store_true',help='display the build stdout')
+    build_parser.add_argument('-n',nargs=1,type=int,metavar='count',
+                              dest='parallel',help='number of tasks run in parallel')
+    build_parser.add_argument('--no-cache', action='store_true', help='do a docker build without using the cache')
+    
+    build_parser.add_argument('targets',metavar='target',nargs='*',help='list of targets to build')
     upload_parser = subparsers.add_parser(
         'upload',
         help='upload built images to registry')
-    upload_parser.add_argument('targets',metavar='target',nargs='*',help="list of targets to upload")
+    upload_parser.add_argument('targets',metavar='target',nargs='*',help='list of targets to upload')
     doit_parser = subparsers.add_parser(
         'doit',
         help='pass raw doit commands')
-        
+    config_parser = subparsers.add_parser(
+        'config',
+        help='set config parameter')
+    group = config_parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--set-insecure', action='store_true',
+                       help='given registry is connected insecure (http/self-signed)')
+    group.add_argument('--set-secure', action='store_true',
+                       help='given registry is connected secure')
+    group.add_argument('--set-registry-path', help='url to registry',metavar='url')
+    group.add_argument('--list',dest='config_mode', action='store_const', const='list')
     parsed = parser.parse_known_args()
+    dodocker_config = load_dodocker_config()
     process_args(*parsed)
-    config = load_config()
     doit.run(globals())
 
