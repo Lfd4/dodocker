@@ -74,12 +74,12 @@ def docker_build(path,tag,dockerfile,pull=False,rm=True):
         return not error
     return docker_build_callable
 
-def shell_build(shell_cmd,image,force=False):
+def shell_build(shell_cmd,image,path='.',force=False):
     def docker_build_callable():
         print(shell_cmd,image)
         if not force and check_available(image):
             return True
-        p = subprocess.Popen([shell_cmd],stdout=sys.stdout,stderr=sys.stderr,shell=True)
+        p = subprocess.Popen([shell_cmd],cwd=path,stdout=sys.stdout,stderr=sys.stderr,shell=True)
         return p.wait() == 0
     return docker_build_callable
 
@@ -201,14 +201,14 @@ def parse_dodocker_yaml(mode):
                 new_task['task_dep'].append('git_{}'.format(image))
                 path = "{}/{}".format(git_repos_path(git_url,git_checkout_type,git_checkout),path)
             if task_type == 'shell':
-                new_task['actions'] = [shell_build(task_description['shell_action'],image)]
+                new_task['actions'] = [shell_build(task_description['shell_action'],image,path=path)]
             elif task_type == 'dockerfile':
                 if not path:
                     sys.exit('Image {}: path missing for build type dockerfile'.format(image))
                 pull = task_description.get('pull',False)
                 rm = task_description.get('rm',True)
                 new_task['actions'] = [docker_build(path,tag=image,dockerfile=dockerfile,pull=pull,rm=rm)]
-
+    
             # tagging
             if not 'tags' in task_description:
                 tags = []
