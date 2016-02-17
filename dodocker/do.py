@@ -220,10 +220,18 @@ def parse_dodocker_yaml(mode):
                 image_no_tag, tag = image.split(':')
             new_task['actions'].append(docker_tag(
                 image, '%s/%s' % (dodocker_config['registry_path'],image_no_tag),tag))
-            for tag in tags:
+            repo = tag = None
+            for t in tags:
+                if ':' in t:
+                    repo,tag = t.strip().split(':')
+                    if not repo:
+                        repo = image_no_tag
+                else:
+                    repo = tag
+                    tag = None
                 new_task['actions'].append(docker_tag(
-                    image,'%s/%s' % (dodocker_config['registry_path'],image) ,tag=tag))
-                new_task['actions'].append(docker_tag(image,image ,tag=tag))
+                    image,'%s/%s' % (dodocker_config['registry_path'],repo) ,tag=tag))
+                new_task['actions'].append(docker_tag(image,repo ,tag=tag))
                    
             # IMPORTANT: image_id has to be the last action. The output of the last action is used for result_dep.
             new_task['actions'].append(image_id(image))
