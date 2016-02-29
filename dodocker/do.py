@@ -227,7 +227,7 @@ def parse_dodocker_yaml(mode):
                     if not repo:
                         repo = image_no_tag
                 else:
-                    repo = tag
+                    repo = t
                     tag = None
                 new_task['actions'].append(docker_tag(
                     image,'%s/%s' % (dodocker_config['registry_path'],repo) ,tag=tag))
