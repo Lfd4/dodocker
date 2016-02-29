@@ -325,7 +325,7 @@ def load_dodocker_config():
     
 def save_dodocker_config(config):
     try:
-        with open(path,'w') as f:
+        with open(dodocker_config_path,'w') as f:
             f.write(yaml.safe_dump(config))
     except IOError:
         sys.exit('Failed to write {}'.format(path))
