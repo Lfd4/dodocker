@@ -79,7 +79,7 @@ def shell_build(shell_cmd,image,path='.',force=False):
         print(shell_cmd,image)
         if check_available(image)() and not force:
             return True
-        p = subprocess.Popen([shell_cmd],cwd=path,stdout=sys.stdout,stderr=sys.stderr,shell=True)
+        p = subprocess.Popen([shell_cmd],cwd=path,shell=True)
         return p.wait() == 0
     return docker_build_callable
 
