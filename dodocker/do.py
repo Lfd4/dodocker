@@ -157,7 +157,7 @@ def parse_dodocker_yaml(mode):
         image = task_description['image']
 
         name = '%s_%s' % (mode, task_description['image'])
-        path = str(task_description.get('path',None))
+        path = str(task_description.get('path',''))
         dockerfile = task_description.get('dockerfile','Dockerfile')
         new_task = {'basename':name, 'verbosity':0}
         git_url = git_checkout = git_checkout_type = None
@@ -201,7 +201,10 @@ def parse_dodocker_yaml(mode):
                 new_task['task_dep'].append('git_{}'.format(image))
                 path = "{}/{}".format(git_repos_path(git_url,git_checkout_type,git_checkout),path)
             if task_type == 'shell':
-                new_task['actions'] = [shell_build(task_description['shell_action'],image,path=path)]
+                if not path:
+                    path = '.'
+                new_task['actions'] = [shell_build(task_description['shell_action'],image,path=path,
+                                                   force=dodocker_config.get('no_cache',False))]
             elif task_type == 'dockerfile':
                 if not path:
                     sys.exit('Image {}: path missing for build type dockerfile'.format(image))
