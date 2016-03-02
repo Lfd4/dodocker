@@ -12,8 +12,8 @@ Variant A: Using the current (root) user and creating a directory with the build
     # Activate the virtualenv 
     . bin/activate
     pip install dodocker
-You are now ready to use dodocker. If you start a new login session, you have to do the `. bin/activate` again.
-
+You are now ready to use dodocker. If you start a new login session, you have to do `. bin/activate` again to
+**initialize the build environment manually**.
     
 Variant B: Create a new non root user dedicated to building images
     # create a 'build' user, create the homedir, use bash and add the user to group docker 
@@ -23,7 +23,7 @@ Variant B: Create a new non root user dedicated to building images
     virtualenv ~
     . ~/bin/activate
     pip install dodocker
-Your are now ready to use dodocker. On every login the build envirtonment is initialized automatically.
+Your are now ready to use dodocker. **On every login** the build envirtonment is **initialized automatically**.
 
 Test your setup:
 ----------------
