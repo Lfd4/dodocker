@@ -19,15 +19,16 @@ You are now ready to use dodocker. If you start a new login session, you have to
     
 Variant B: Create a new non root user dedicated to building images
 
-    # create a 'build' user, create the homedir, use bash and add the user to group docker 
-    useradd -c "docker builder" -ms /bin/bash -G docker build 
-    su - build # Login to your build user.
+    # create a 'builder' user, create the homedir, use bash and add the user to group docker 
+    useradd -c "docker builder" -ms /bin/bash -G docker builder 
+    su - builder # Login to your build user.
     # create a python virtual env in the home directory
     virtualenv ~
     . ~/bin/activate
     pip install dodocker
     
-Your are now ready to use dodocker. **On every login** the build envirtonment is **initialized automatically**.
+Your are now ready to use dodocker. **On every login** to the builder user the environment
+is **initialized automatically**.
 
 Test your setup:
 ----------------
