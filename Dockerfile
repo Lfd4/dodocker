@@ -15,7 +15,7 @@ RUN DEBIAN_FRONTEND=noninteractive \
     apt-get -y --no-install-recommends install \
             docker-engine debootstrap busybox-static python-pip sudo
 COPY . /dodocker
-ADD tools/alias /usr/bin
+ADD tools/alias /usr/bin/
 RUN pip install /dodocker
 RUN mv /dodocker/example /build
 WORKDIR /build
