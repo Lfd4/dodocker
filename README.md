@@ -105,16 +105,16 @@ Uploading to a private registry
 
 Before uploading docker images, the registry path has to be set.
 
-    $ dodocker config -set-registry registry.yourdomain.com:443
+    $ dodocker config --set-registry registry.yourdomain.com:443
 
 To allow registry uploads via http or unsigned certificates it is possible to allow insecure
 registries:
 
-    $ dodocker config -set-insecure
+    $ dodocker config --set-insecure
 
 switch it back to secure only:
 
-    $ dodocker config -set-secure
+    $ dodocker config --set-secure
 
 Settings are saved in a `dodocker.cfg` file in the current directory.
 
