@@ -26,21 +26,16 @@ point for creating an environment for building your own Debian and Ubuntu base i
 
 Run `docker build -t dodocker .` inside the dodocker directory. 
 
-When built you can execute a build with:
-docker run -v /var/run/docker.sock:/var/run/docker.sock -ti --rm dodocker
+When built start dodocker into background:
 
+    docker run -v /var/run/docker.sock:/var/run/docker.sock -d dodocker
+    
 
 Quick start
 ===========
 
-The build is defined in a dodocker.yaml file following the
-[YAML data structure syntax](http://www.yaml.org/start.html). Every build is described as a list of dictionary
-entries where every dictionary is defining a build whereas a build can be done by executing a Dockerfile
-or executing a shell action. Generally shell actions should be used only to build the needed bootstrap
-images (debian,ubuntu, ...). In this example an nginx image is build, which is dependant on a debian image.
-This debian image is build by debootstrap using the docker mkimage script. The nginx image is built by docker
-and the provided Dockerfile in the directory images/nginx. The registry image is build by cloning a github
-respository and building the image by docker with the included Dockerfile.
+The build hierarchy is defined in a dodocker.yaml file following the
+[YAML data structure syntax](http://www.yaml.org/start.html). 
 
 Example:
 
@@ -57,7 +52,16 @@ Example:
       shell_action: >
           mkimage.sh -t debian-base:jessie debootstrap
 	             --variant=minbase jessie http://ftp.debian.org/debian
-		     
+
+* A dodocker.yaml is described as a sequence of mapping nodes.
+* Path is pointing to the image source directory. Path is always relative to the directory containing
+  the dodocker.yaml
+* A build is by default based upon a Dockerfile with is located in the directy path is pointing to.
+* An alternative to Dockerfile based builds are shell-actions. These should generally only be used
+  to contruct base images.
+* Add a `depends` to an image to create a dependency upon some image
+* Add `git_url` to fetch a branch (master is default), tag or commit from a git url. Please note that
+  path is relative to the checked out source in this case.
 
 Available dodocker.yaml config options
 ======================================
@@ -65,6 +69,7 @@ Available dodocker.yaml config options
 for shell actions:
 
     image: name of image
+    path: path/to/directory (optional)
     shell_action: "command to be exected" 
     depends: image name to depend upon (optional)
     tags: [tag1,tag2,...] (optional list of tags)
@@ -93,10 +98,13 @@ build in verbose mode.
 
     $ dodocker build -v
 
-It is also possible to build images in parallel. A warning though: There seems to be a race
-condition within docker to make a build fail from time to time, when running in parallel.
-Restarting the build will finish the build eventually.
-This will run 4 build processes in parallel:
+Image to be build can be specified as arguments. Only these images and those they are depending upon
+will be built. The image name as stated in the dodocker.yaml is to be used as parameter to dodocker build
+
+    $ dodocker build jwilder/nginx-proxy mystuff/apache2.4-php-mysql
+
+It is also possible to build images in parallel. This will run 4 build processes in parallel as long as
+dependencies are allowing for:
 
     $ dodocker build -n 4
 
