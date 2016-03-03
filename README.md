@@ -103,9 +103,11 @@ This will run 4 build processes in parallel:
 Uploading to a private registry
 ===============================
 
-Before uploading docker images, the registry path has to be set.
+Before uploading docker images, the registry path has to be set. In this example uploads are
+configured to be pushed to registry.yourdomain.com using https and expecting a valid certificate.
 
     $ dodocker config --set-registry registry.yourdomain.com:443
+    $ dodocker config --set-secure
 
 To allow registry uploads via http or unsigned certificates it is possible to allow insecure
 registries:
@@ -122,6 +124,6 @@ To upload:
 
     $ dodocker upload
 
-This will push the images to the private registry.
+This will push all images defined in dodocker.yaml to the private registry.
 
 
