@@ -94,7 +94,7 @@ def docker_push(repository,tag):
         error = False
         print("push:",repository,tag)
         try:
-            result = doc.push(repository,stream=True,tag=tag,insecure_registry=config['insecure'])
+            result = doc.push(repository,stream=True,tag=tag,insecure_registry=dodocker_config['insecure'])
         except docker.errors.DockerException as e:
             sys.exit(e)
         for line in result:
