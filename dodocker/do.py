@@ -148,6 +148,7 @@ def update_git(git_url, checkout_type, checkout):
     return update_git_callable
 
 def parse_dodocker_yaml(mode):
+    parse_errors = []
     try:
         with open('dodocker.yaml','r') as f:
             yaml_data = yaml.safe_load(f)
@@ -158,6 +159,8 @@ def parse_dodocker_yaml(mode):
 
         name = '%s_%s' % (mode, task_description['image'])
         path = str(task_description.get('path',''))
+        if not path:
+            parse_errors.append('image {}: no path given'.format(image))
         dockerfile = task_description.get('dockerfile','Dockerfile')
         new_task = {'basename':name, 'verbosity':0}
         git_url = git_checkout = git_checkout_type = None
@@ -170,7 +173,7 @@ def parse_dodocker_yaml(mode):
                 except ValueError:
                     pass
                 if not git_checkout_type in ('branch','tags','commit'):
-                    sys.exit('wrong tree format {} for url {}'.format(git_options[1],git_url))
+                    parse_errors.append('image {}: wrong tree format {} for url {}'.format(image,git_options[1],git_url))
             else:
                 git_checkout_type = 'branch'
                 git_checkout = 'master'
@@ -206,8 +209,6 @@ def parse_dodocker_yaml(mode):
                 new_task['actions'] = [shell_build(task_description['shell_action'],image,path=path,
                                                    force=dodocker_config.get('no_cache',False))]
             elif task_type == 'dockerfile':
-                if not path:
-                    sys.exit('Image {}: path missing for build type dockerfile'.format(image))
                 pull = task_description.get('pull',False)
                 rm = task_description.get('rm',True)
                 new_task['actions'] = [docker_build(path,tag=image,dockerfile=dockerfile,pull=pull,rm=rm)]
@@ -262,6 +263,8 @@ def parse_dodocker_yaml(mode):
                 image, tag = image.split(':')
             new_task['actions'] = [docker_push('%s/%s' % (dodocker_config['registry_path'],image), tag)]
         yield new_task
+    if parse_errors:
+        sys.exit("\n".join(parse_errors))
 
 def task_git():
     all_build_tasks = []
