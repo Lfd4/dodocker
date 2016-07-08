@@ -385,8 +385,7 @@ def process_args(parsed,unparsed):
             config_set('registry_path', parsed.set_registry_path)
         sys.exit(0)
 
-def main():
-    global dodocker_config
+def create_parser():
     parser = argparse.ArgumentParser(epilog=LICENSE_TEXT,
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-c', dest='configfile',
@@ -427,8 +426,12 @@ def main():
                        help='given registry is connected secure')
     group.add_argument('--set-registry-path', help='url to registry',metavar='url')
     group.add_argument('--list',dest='config_mode', action='store_const', const='list')
+    return parser
+
+def main():
+    parser = create_parser()
     parsed = parser.parse_known_args()
-    dodocker_config = load_dodocker_config()
+    dodocker_config.update(load_dodocker_config())
     process_args(*parsed)
     doit.run(globals())
 
