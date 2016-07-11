@@ -428,6 +428,15 @@ def create_parser():
     group.add_argument('--list',dest='config_mode', action='store_const', const='list')
     return parser
 
+def run_dodocker_cli(args):
+    # helper function for external programs like tests
+    parser = create_parser()
+    parsed = parser.parse_known_args(args)
+    dodocker_config.clear()
+    dodocker_config.update(load_dodocker_config())
+    process_args(*parsed)
+    doit.run(globals())
+
 def main():
     parser = create_parser()
     parsed = parser.parse_known_args()
