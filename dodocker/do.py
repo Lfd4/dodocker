@@ -435,7 +435,12 @@ def run_dodocker_cli(args):
     dodocker_config.clear()
     dodocker_config.update(load_dodocker_config())
     process_args(*parsed)
-    doit.run(globals())
+    try:
+        doit.run(globals())
+    except SystemExit, e:
+        # catch normal zero exit, but re-raise other
+        if e.code != 0:
+            raise
 
 def main():
     parser = create_parser()
