@@ -9,3 +9,4 @@ include/*
 example/.doit.db
 .tox
 .coverage
+.cache

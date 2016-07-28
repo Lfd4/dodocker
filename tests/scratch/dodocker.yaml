@@ -1,0 +1,5 @@
+- image: test1
+  path: image1
+
+- image: test2
+  path: image2
