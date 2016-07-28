@@ -1,6 +1,6 @@
 FROM busybox
 
-ADD test.txt /
+ADD a.txt /
 
 
 

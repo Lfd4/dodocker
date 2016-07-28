@@ -10,3 +10,4 @@ example/.doit.db
 .tox
 .coverage
 .cache
+.doit.db
