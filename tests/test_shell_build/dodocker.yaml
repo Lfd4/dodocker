@@ -1,0 +1,8 @@
+- image: dodockertest/shtest1
+  path: image1
+  shell_action: sh test.sh
+
+- image: dodockertest/shtest2
+  path: image2
+  depends: dodockertest/shtest1
+  

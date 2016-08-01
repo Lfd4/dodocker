@@ -1,5 +1,10 @@
-- image: test1
+- image: dodockertest/test1
   path: image1
 
-- image: test2
+- image: dodockertest/test2
+  depends: dodockertest/test1
   path: image2
+
+- image: dodockertest/test3
+  depends: dodockertest/test2
+  path: image3

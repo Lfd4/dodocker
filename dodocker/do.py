@@ -355,6 +355,8 @@ def process_args(parsed,unparsed):
     if parsed.yamldir:
         os.chdir(parsed.yamldir)
     sys.argv = [sys.argv[0]]
+    if parsed.output_file:
+        sys.argv.extend(('-o',parsed.output_file))
     if parsed.subcommand == 'build':
         if parsed.verbose:
             sys.argv.extend(('--verbosity','2'))
@@ -394,7 +396,9 @@ def create_parser():
     parser.add_argument('-d', dest='yamldir',
                         metavar='directory',
                         help='this directory contains the dodocker.yaml file')
-    
+    parser.add_argument('-o', dest='output_file',
+                        metavar='report output file',
+                        help='capture report in output file')
     subparsers = parser.add_subparsers(
         title='sub-commands of dodocker',
         description='dodocker is devided into sub-commands. Please refer to their help.',
