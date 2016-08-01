@@ -6,11 +6,12 @@ Overview
 ========
 
 dodocker is a dependency based build tool for docker images. It supports uploading 
-built images to a private registry. It is based upon [doit task management & automation tool](http://pydoit.org/). 
+built images to a private registry. It is based upon
+[doit task management & automation tool](http://pydoit.org/). 
 The build configuration is provided by a very simple to use yaml file.
 
-Dodocker was created by the need of creating images independent from the docker.com registry. Nevertheless it is
-possible to base your builds on the public docker registry.
+Dodocker was created by the need of creating images independent from the docker.com registry.
+Nevertheless it is possible to base your builds on the public docker registry.
 
 Installation
 ============
@@ -19,8 +20,9 @@ You have two options:
 
 1. Build your own environment
 
-Please consulte the README.md file in the example directory. This is a complete setup and a starting
-point for creating an environment for building your own Debian and Ubuntu base images.
+Please consulte the README.md file in the example directory. This is a complete setup
+and a starting point for creating an environment for building your own Debian and Ubuntu
+base images.
 
 2. Build within a dodocker image
 
@@ -28,8 +30,11 @@ Run `docker build -t dodocker .` inside the dodocker directory.
 
 When built start dodocker into background:
 
-    docker run -v /var/run/docker.sock:/var/run/docker.sock -d dodocker
-    
+    docker run -v /var/run/docker.sock:/var/run/docker.sock \
+    	   -v hostvolumemount FIXME
+           -d dodocker
+
+
 
 Quick start
 ===========
