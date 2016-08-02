@@ -1,6 +1,6 @@
 import pytest
 from distutils.dir_util import copy_tree
-import os, hashlib
+import os, hashlib, subprocess
 
 @pytest.yield_fixture(scope='module')
 def tmpdir_copy(tmpdir_factory, request):
@@ -11,8 +11,16 @@ def tmpdir_copy(tmpdir_factory, request):
                   os.getcwd())
     yield t
 
-
+def find_and_delete_testimages():
+    images = " ".join(subprocess.check_output(
+        "docker images | grep dodockertest | awk '{print $1}'", shell=True
+        ).split())
+    if not images:
+        return
+    subprocess.check_call(["docker rmi {}".format(images)], shell=True)
     
 @pytest.yield_fixture(scope='session', autouse=True)
-def on_session_start_clean_docker():
+def on_session_start_end_clean_docker_from_testimages():
+    find_and_delete_testimages()
     yield
+    find_and_delete_testimages()
