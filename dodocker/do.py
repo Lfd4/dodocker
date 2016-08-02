@@ -438,8 +438,8 @@ def run_dodocker_cli(args):
     parsed = parser.parse_known_args(args)
     dodocker_config.clear()
     dodocker_config.update(load_dodocker_config())
-    process_args(*parsed)
     try:
+        process_args(*parsed)
         doit.run(globals())
     except SystemExit, e:
         # catch normal zero exit, but re-raise other
