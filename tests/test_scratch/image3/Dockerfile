@@ -1,3 +1,3 @@
-FROM test2
+FROM dodockertest/test2
 
 ADD c.txt /

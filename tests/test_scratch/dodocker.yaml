@@ -8,3 +8,6 @@
 - image: dodockertest/test3
   depends: dodockertest/test2
   path: image3
+  tags: ['dodockertestother',
+         ':othertag',
+         'dodockertestother:andanothertag']
