@@ -1,0 +1,7 @@
+- image: dodockertest/gittesttag
+  git_url: https://github.com/nawork/dodocker-git-testcase tags/v1.0
+  path: .
+  
+- image: dodockertest/a-dependent-image-2
+  path: image1
+  depends: dodockertest/gittesttag
