@@ -42,7 +42,7 @@ def image_id(image):
         try:
             data = doc.inspect_image(image)
         except docker.errors.APIError as e:
-            if e.response.status_code != 404:
+            if e.response.status_code != 404: # pragma: no cover
                 raise
             return False
         return data['Id']
@@ -53,7 +53,7 @@ def check_available(image):
         try:
             data = doc.inspect_image(image)
         except docker.errors.APIError as e:
-            if e.response.status_code != 404:
+            if e.response.status_code != 404: # pragma: no cover
                 raise
             return False
         return True
