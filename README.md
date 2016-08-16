@@ -16,24 +16,23 @@ Nevertheless it is possible to base your builds on the public docker registry.
 Installation
 ============
 
-You have two options:
+For basic usage choose option 1 or 2. Option 3 is more involved and probably not what you want.
 
-1. Build your own environment
+1. Easy install
+
+Run `eval $(docker run nawork/dodocker alias)` inside the dodocker directory. This will provide you with
+the command `dodocker` which is an alias that will call docker run nawork/dodocker
+
+2. Building your own dodocker
+
+Check out dodocker from github. In the dodocker directory run `docker build -t nawork/dodocker .`. 
+After building is complete activate the alias with `eval $(docker run nawork/dodocker alias)`
+
+3. Install dodocker as a python package
 
 Please consulte the README.md file in the example directory. This is a complete setup
-and a starting point for creating an environment for building your own Debian and Ubuntu
-base images.
-
-2. Build within a dodocker image
-
-Run `docker build -t dodocker .` inside the dodocker directory. 
-
-When built start dodocker into background:
-
-    docker run -v /var/run/docker.sock:/var/run/docker.sock \
-    	   -v hostvolumemount FIXME
-           -d dodocker
-
+and a starting point for creating an environment for integrating dodocker in a building 
+environment.
 
 
 Quick start
@@ -42,7 +41,16 @@ Quick start
 The build hierarchy is defined in a dodocker.yaml file following the
 [YAML data structure syntax](http://www.yaml.org/start.html). 
 
-Example:
+For the impatient:
+
+Assuming you activated the dodocker alias, create an empty directory and call `dodocker quickstart`.
+This will copy a quickstart project to the empty directory. It contains build jobs for base images like
+Debian, Apline and Ubuntu as well as the docker registry. Have a look.
+
+Dodocker YAML
+=============
+
+Let's consider this example dodocker.yaml:
 
     - image: nginx
       depends: debian-base:jessie
@@ -74,7 +82,7 @@ Available dodocker.yaml config options
 for shell actions:
 
     image: name of image
-    path: path/to/directory (optional)
+    path: path/to/directory 
     shell_action: "command to be exected" 
     depends: image name to depend upon (optional)
     tags: [tag1,tag2,...] (optional list of tags)

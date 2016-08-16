@@ -13,13 +13,9 @@ RUN echo deb http://apt.dockerproject.org/repo debian-jessie main >/etc/apt/sour
 RUN DEBIAN_FRONTEND=noninteractive \
     apt-get update && \
     apt-get -y --no-install-recommends install \
-            docker-engine debootstrap busybox-static python-pip sudo
+            docker-engine debootstrap busybox-static python-pip sudo curl
 COPY . /dodocker
-ADD tools/alias /usr/bin/
 RUN pip install /dodocker
-RUN mv /dodocker/example /build
 WORKDIR /build
-# running the image will keep the container alive in an endless loop
-# dodocker is called by docker exec.
-CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
+
 

@@ -1,0 +1,21 @@
+- image: debian-base:jessie
+  path: images/baseimages/docker-mkimage
+  shell_action: "sudo mkimage.sh -t debian-base:jessie debootstrap --variant=minbase jessie http://ftp.debian.org/debian"
+
+- image: debian:jessie
+  path: images/baseimages/debian/jessie
+  depends: debian-base:jessie
+  file_dep: [Dockerfile,sources.list]
+
+- image: alpine:3.4
+  path: images/baseimages/docker-mkimage
+  shell_action: "sudo mkimage-alpine.sh"
+
+#- image: ubuntu-base:14.04
+#  shell_action: "sudo images/baseimages/docker-mkimage/mkimage.sh -t ubuntu-base:14.04 debootstrap --include=ubuntu-minimal trusty http://archive.ubuntu.com/ubuntu/"
+
+#- image: ubuntu:14.04
+#  depends: ubuntu-base:14.04
+#  path: images/baseimages/ubuntu
+#  file_dep: [Dockerfile,sources.list]
+

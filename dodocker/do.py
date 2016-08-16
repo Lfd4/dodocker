@@ -28,6 +28,7 @@ dodocker_config_path = '.dodocker.cfg'
 
 import os, yaml, json, sys, re, time, hashlib, argparse
 from doit.tools import result_dep, run_once
+from distutils.dir_util import copy_tree
 import docker
 import subprocess
 import git
@@ -386,6 +387,16 @@ def process_args(parsed,unparsed):
         elif parsed.set_registry_path:
             config_set('registry_path', parsed.set_registry_path)
         sys.exit(0)
+    elif parsed.subcommand == 'alias':
+        print("alias dodocker='docker run --rm -tv /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/build nawork/dodocker dodocker'")
+        sys.exit(0)
+    elif parsed.subcommand == 'quickstart':
+        if not os.path.exists('/dodocker/quickstart'):
+            sys.exit('dodocker: quickstart files not found.')
+        if os.listdir('.'):
+            sys.exit('dodocker: directory not empty. quickstart project NOT created')
+        copy_tree('/dodocker/quickstart','/build')
+        sys.exit(0)
 
 def create_parser():
     parser = argparse.ArgumentParser(epilog=LICENSE_TEXT,
@@ -430,6 +441,12 @@ def create_parser():
                        help='given registry is connected secure')
     group.add_argument('--set-registry-path', help='url to registry',metavar='url')
     group.add_argument('--list',dest='config_mode', action='store_const', const='list')
+    alias_parser = subparsers.add_parser(
+        'alias',
+        help='return an alias command to conveniently call dodocker as a docker run command')
+    quickstart_parser = subparsers.add_parser(
+        'quickstart',
+        help='populate an empty directory with the quickstart project')
     return parser
 
 def run_dodocker_cli(args):

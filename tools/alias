@@ -1,5 +1,0 @@
-#!/bin/bash
-
-cat << EOM
-alias dodocker=docker exec $(hostname) -ti dodocker
-EOM
