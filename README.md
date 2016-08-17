@@ -8,32 +8,25 @@ Overview
 dodocker is a dependency based build tool for docker images. It supports uploading 
 built images to a private registry. It is based upon
 [doit task management & automation tool](http://pydoit.org/). 
-The build configuration is provided by a very simple to use yaml file.
-
-Dodocker was created by the need of creating images independent from the docker.com registry.
-Nevertheless it is possible to base your builds on the public docker registry.
+The build configuration is described in a simple to use yaml file.
+Dodocker was originally created by the need of creating images independent from the docker.com registry.
+Nevertheless it is very convinient to base your build configuration on the public docker registry.
 
 Installation
 ============
 
-For basic usage choose option 1 or 2. Option 3 is more involved and probably not what you want.
+For basic usage choose option 1 or 2. Option 3 is more involved and probably not what you want to dive into dodocker.
 
 1. Easy install
-
 Run `eval $(docker run nawork/dodocker alias)` inside the dodocker directory. This will provide you with
 the command `dodocker` which is an alias that will call docker run nawork/dodocker
-
 2. Building your own dodocker
-
 Check out dodocker from github. In the dodocker directory run `docker build -t nawork/dodocker .`. 
 After building is complete activate the alias with `eval $(docker run nawork/dodocker alias)`
-
 3. Install dodocker as a python package
-
 Please consulte the README.md file in the example directory. This is a complete setup
 and a starting point for creating an environment for integrating dodocker in a building 
 environment.
-
 
 Quick start
 ===========
@@ -45,7 +38,13 @@ For the impatient:
 
 Assuming you activated the dodocker alias, create an empty directory and call `dodocker quickstart`.
 This will copy a quickstart project to the empty directory. It contains build jobs for base images like
-Debian, Apline and Ubuntu as well as the docker registry. Have a look.
+Debian, Apline and Ubuntu as well as the docker registry.
+
+```
+$ dodocker quickstart
+$ ls
+dodocker.yaml  images  README.md
+```
 
 Dodocker YAML
 =============
@@ -69,10 +68,10 @@ Let's consider this example dodocker.yaml:
 * A dodocker.yaml is described as a sequence of mapping nodes.
 * Path is pointing to the image source directory. Path is always relative to the directory containing
   the dodocker.yaml
-* A build is by default based upon a Dockerfile with is located in the directy path is pointing to.
+* A build is by default based upon a Dockerfile with is located in the directory path is pointing to.
 * An alternative to Dockerfile based builds are shell-actions. These should generally only be used
-  to contruct base images.
-* Add a `depends` to an image to create a dependency upon some image
+  to contruct base images, since the underlying dependency engine
+* Add a `depends` to an image to create a dependency on some other image
 * Add `git_url` to fetch a branch (master is default), tag or commit from a git url. Please note that
   path is relative to the checked out source in this case.
 
