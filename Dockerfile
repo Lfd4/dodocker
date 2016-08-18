@@ -13,7 +13,7 @@ RUN echo deb http://apt.dockerproject.org/repo debian-jessie main >/etc/apt/sour
 RUN DEBIAN_FRONTEND=noninteractive \
     apt-get update && \
     apt-get -y --no-install-recommends install \
-            docker-engine debootstrap busybox-static python-pip sudo curl
+            docker-engine debootstrap busybox-static python-pip sudo curl git
 COPY . /dodocker
 RUN pip install /dodocker
 WORKDIR /build
