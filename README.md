@@ -18,12 +18,15 @@ Installation
 For basic usage choose option 1 or 2. Option 3 is more involved and probably not what you want to dive into dodocker.
 
 1. Easy install
+
 Run `eval $(docker run nawork/dodocker alias)` inside the dodocker directory. This will provide you with
 the command `dodocker` which is an alias that will call docker run nawork/dodocker
 2. Building your own dodocker
+
 Check out dodocker from github. In the dodocker directory run `docker build -t nawork/dodocker .`. 
 After building is complete activate the alias with `eval $(docker run nawork/dodocker alias)`
 3. Install dodocker as a python package
+
 Please consulte the README.md file in the example directory. This is a complete setup
 and a starting point for creating an environment for integrating dodocker in a building 
 environment.
