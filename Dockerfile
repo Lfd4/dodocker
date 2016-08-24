@@ -10,10 +10,13 @@
 FROM debian:jessie
 RUN apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
 RUN echo deb http://apt.dockerproject.org/repo debian-jessie main >/etc/apt/sources.list.d/docker.list
+RUN echo deb http://ftp.debian.org/debian jessie-backports main >/etc/apt/sources.list.d/backport.list
 RUN DEBIAN_FRONTEND=noninteractive \
     apt-get update && \
     apt-get -y --no-install-recommends install \
-            docker-engine debootstrap busybox-static python-pip sudo curl git
+            docker-engine busybox-static python-pip sudo curl git xz-utils make && \
+    apt-get -y --no-install-recommends -t jessie-backports install debootstrap
+
 COPY . /dodocker
 RUN pip install /dodocker
 WORKDIR /build
