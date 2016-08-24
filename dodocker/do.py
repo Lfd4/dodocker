@@ -388,7 +388,7 @@ def process_args(parsed,unparsed):
             config_set('registry_path', parsed.set_registry_path)
         sys.exit(0)
     elif parsed.subcommand == 'alias':
-        print("alias dodocker='docker run --rm -tv /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/build nawork/dodocker dodocker'")
+        print("alias dodocker='docker run --rm --privileged -tv /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/build nawork/dodocker dodocker'")
         sys.exit(0)
     elif parsed.subcommand == 'quickstart':
         if not os.path.exists('/dodocker/quickstart'):
