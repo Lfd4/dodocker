@@ -5,7 +5,6 @@
 #  doDocker (c) 2014-2016 Andreas Elvers
 #  n@work Internet Informationssysteme GmbH
 #
-#  doDocker is based upon pydoit.org 
 
 FROM debian:jessie
 RUN apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
@@ -14,11 +13,12 @@ RUN echo deb http://ftp.debian.org/debian jessie-backports main >/etc/apt/source
 RUN DEBIAN_FRONTEND=noninteractive \
     apt-get update && \
     apt-get -y --no-install-recommends install \
-            docker-engine busybox-static python-pip sudo curl git xz-utils make && \
+            docker-engine busybox-static python-pip sudo curl git xz-utils make ssh && \
     apt-get -y --no-install-recommends -t jessie-backports install debootstrap
 
 COPY . /dodocker
 RUN pip install /dodocker
 WORKDIR /build
+RUN sed -E -e "s#:/root:#:/build:#" -i /etc/passwd
 
 
