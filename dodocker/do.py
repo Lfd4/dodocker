@@ -388,7 +388,8 @@ def process_args(parsed,unparsed):
             config_set('registry_path', parsed.set_registry_path)
         sys.exit(0)
     elif parsed.subcommand == 'alias':
-        print("alias dodocker='docker run --rm --privileged -tv /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/build nawork/dodocker dodocker'")
+        print("alias dodocker='docker run --rm --privileged -itv /var/run/docker.sock:/var/run/docker.sock {} -v $(pwd):/build nawork/dodocker dodocker'".format(
+            ['','-v $(dirname $SSH_AUTH_SOCK):$(dirname $SSH_AUTH_SOCK) -e SSH_AUTH_SOCK=$SSH_AUTH_SOCK'][parsed.ssh_agent]))
         sys.exit(0)
     elif parsed.subcommand == 'quickstart':
         if not os.path.exists('/dodocker/quickstart'):
@@ -444,6 +445,8 @@ def create_parser():
     alias_parser = subparsers.add_parser(
         'alias',
         help='return an alias command to conveniently call dodocker as a docker run command')
+    alias_parser.add_argument('--ssh-agent', action='store_true',
+                              help='Forwarding ssh into container by host-mounting agent socket.')
     quickstart_parser = subparsers.add_parser(
         'quickstart',
         help='populate an empty directory with the quickstart project')
