@@ -1,6 +1,8 @@
 ========
 dodocker
 ========
+[![Build Status](https://travis-ci.org/nawork/dodocker.svg?branch=master)](https://travis-ci.org/nawork/dodocker)
+[![Coverage Status](https://coveralls.io/repos/github/nawork/dodocker/badge.svg?branch=master)](https://coveralls.io/github/nawork/dodocker?branch=master)
 
 Overview
 ========
