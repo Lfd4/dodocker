@@ -3,7 +3,6 @@
 from setuptools import setup, find_packages
 setup(
     name = "dodocker",
-    packages = ["dodocker"],
     version = "1.0a01",
     zip_safe = True,
     packages = find_packages(),
