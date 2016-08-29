@@ -86,7 +86,7 @@ def shell_build(shell_cmd,image,path='.',force=False):
         p = subprocess.Popen([shell_cmd],cwd=path,shell=True,
                              stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
         while p.poll() is None:
-            sys.stdout.write(p.stdout.readline())
+            sys.stdout.write(p.stdout.readline().decode('utf-8'))
         return p.wait() == 0
     return docker_build_callable
 
