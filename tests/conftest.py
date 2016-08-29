@@ -1,6 +1,6 @@
 import pytest
 from distutils.dir_util import copy_tree
-import os, hashlib, subprocess
+import os, hashlib, subprocess, time
 
 @pytest.yield_fixture(scope='module')
 def tmpdir_copy(tmpdir_factory, request):
@@ -38,6 +38,7 @@ def docker_registry(scope='session'):
     subprocess.check_call(
         ['docker run -d -p 5000:5000 --name dodockerregistry registry:2'],
         shell=True)
+    time.sleep(1) # wait for registry to become really ready
     yield None
     subprocess.check_call(
         ['docker stop dodockerregistry && docker rm dodockerregistry'],
