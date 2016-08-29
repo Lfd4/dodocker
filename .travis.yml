@@ -14,3 +14,6 @@ install:
   - pip install -r requirements.txt
 # command to run tests
 script: sudo tox
+after_success:
+  - coveralls
+
