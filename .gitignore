@@ -11,3 +11,4 @@ example/.doit.db
 .coverage
 .cache
 .doit.db
+dist
