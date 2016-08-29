@@ -10,25 +10,24 @@ built images to a private registry. It is based upon
 [doit task management & automation tool](http://pydoit.org/). 
 The build configuration is described in a simple to use yaml file.
 Dodocker was originally created by the need of creating images independent from the docker.com registry.
-Nevertheless it is very convinient to base your build configuration on the public docker registry.
+Nevertheless your are totally free to base your build configuration on the public docker registry.
 
 Installation
 ============
 
-For basic usage choose option 1 or 2. Option 3 is more involved and probably not what you want to dive into dodocker.
-
 1. Easy install
 
-Run `eval $(docker run nawork/dodocker dodocker alias)` inside the dodocker directory. This will provide you with
-the command `dodocker` which is an alias that will call docker run nawork/dodocker
+Run `eval $(docker run --rm nawork/dodocker dodocker alias)`. This will pull the dodocker image from 
+the public registry and execute the alias command of dodocker. You can now access
+the command `dodocker` within your current shell. The command runs in its own temporary container.
 2. Building your own dodocker
 
 Check out dodocker from github. In the dodocker directory run `docker build -t nawork/dodocker .`. 
-After building is complete activate the alias with `eval $(docker run nawork/dodocker dodocker alias)`
+After building is complete activate the alias with `eval $(docker run --rm nawork/dodocker dodocker alias)`
 3. Install dodocker as a python package
 
-Please consulte the README.md file in the example directory. This is a complete setup
-and a starting point for creating an environment for integrating dodocker in a building 
+Please consulte the README.md file in the example directory. It describes a complete setup
+and is a starting point for creating an environment for integrating dodocker in a building 
 environment.
 
 Quick start
@@ -52,6 +51,9 @@ dodocker.yaml  images  README.md
 Dodocker YAML
 =============
 
+The `dodocker.yaml` file containers a list of rules to build images. Every rule is a mapping that contains
+key/value pairs.
+
 Let's consider this example dodocker.yaml:
 
     - image: nginx
@@ -59,7 +61,7 @@ Let's consider this example dodocker.yaml:
       path: images/nginx
      
     - image: registry:2
-      git_url: git@github.com:docker/distribution.git
+      git_url: git@github.com:docker/distribution.git tags/v2.5.0
       path: .
 
     - image: debian-base:jessie
@@ -69,11 +71,13 @@ Let's consider this example dodocker.yaml:
 	             --variant=minbase jessie http://ftp.debian.org/debian
 
 * A dodocker.yaml is described as a sequence of mapping nodes.
+* Every definition has a required image name and optional tag
 * Path is pointing to the image source directory. Path is always relative to the directory containing
   the dodocker.yaml
 * A build is by default based upon a Dockerfile with is located in the directory path is pointing to.
-* An alternative to Dockerfile based builds are shell-actions. These should generally only be used
-  to contruct base images, since the underlying dependency engine
+* An alternative to Dockerfile based builds are shell-actions. These should only be used
+  to contruct base images which are not buildable via Dockerfiles. For shell actions dodocker expects
+  the shell script to create an image that has a name and tag like described in the dodocker.yaml. 
 * Add a `depends` to an image to create a dependency on some other image
 * Add `git_url` to fetch a branch (master is default), tag or commit from a git url. Please note that
   path is relative to the checked out source in this case.
