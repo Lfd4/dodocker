@@ -12,12 +12,10 @@
   parameterization:
     dict_list:
       - debian_version: 1.9.1-0~jessie
-        tag: 1.9.1
+        tags: [1.9.1]
       - debian_version: 1.10.3-0~jessie
-        tag: 1.10.3
+        tags: [1.10.3]
       - debian_version: 1.11.2-0~jessie
-        tag: 1.11.2
+        tags: [1.11.2]
       - debian_version: 1.12.1-0~jessie
         tag: [latest, 1.12.1]
-    build_param: [debian_version]
-
