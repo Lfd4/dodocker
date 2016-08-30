@@ -464,7 +464,7 @@ def run_dodocker_cli(args):
     try:
         process_args(*parsed)
         doit.run(globals())
-    except SystemExit, e:
+    except SystemExit as e:
         # catch normal zero exit, but re-raise other
         if e.code != 0:
             raise
