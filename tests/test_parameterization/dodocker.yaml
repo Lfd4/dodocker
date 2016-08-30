@@ -1,0 +1,14 @@
+- image: dodockertest/paramtest1
+  path: image1
+  parameterization:
+    dict_list:
+      - a: one
+        b: two
+        c: three
+        tags:[v1]
+      - b: no_default
+        tags:[v2]
+      - a: eins
+        b: zwei
+        c: drei
+        tags: [v3,latest]
