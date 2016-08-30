@@ -175,15 +175,16 @@ def parse_dodocker_yaml(mode):
         sys.exit('No dodocker.yaml found')
     for task_description in yaml_data:
         paramize = task_description.get('parameterization')
-        if paramize and 'shell_action' in task_description:
-            parse_errors.append('image {}: parameterization is not available with shell_actions'.format(image))
-            continue
-        if paramize and 'tags' in task_description:
-            parse_errors.append('image {}: tags parameter is not available outside of parameterization'.format(image))
-            continue
+        if paramize:
+            if 'shell_action' in task_description:
+                parse_errors.append('image {}: parameterization is not available with shell_actions'.format(image))
+                continue
+            if 'tags' in task_description:
+                parse_errors.append('image {}: tags parameter is not available outside of parameterization'.format(image))
+                continue
         if not paramize:
             paramize = [{}]
-        for paramize_item in paramize['dict_list']:
+        for task_item in taskitems:
             image = task_description['image']
             name = '%s_%s' % (mode, task_description['image'])
             path = str(task_description.get('path',''))
