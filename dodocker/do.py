@@ -174,114 +174,127 @@ def parse_dodocker_yaml(mode):
     except IOError:
         sys.exit('No dodocker.yaml found')
     for task_description in yaml_data:
-        image = task_description['image']
-
-        name = '%s_%s' % (mode, task_description['image'])
-        path = str(task_description.get('path',''))
-        if not path:
-            parse_errors.append('image {}: no path given'.format(image))
-        dockerfile = task_description.get('dockerfile','Dockerfile')
-        new_task = {'basename':name, 'verbosity':0}
-        git_url = git_checkout = git_checkout_type = None
-        git_options = task_description.get('git_url',"").split()
-        if git_options:
-            git_url = git_options[0]
-            if len(git_options) == 2:
-                try:
-                    (git_checkout_type, git_checkout) = git_options[1].split('/')
-                except ValueError:
-                    pass
-                if not git_checkout_type in ('branch','tags','commit'):
-                    parse_errors.append('image {}: wrong tree format {} for url {}'.format(image,git_options[1],git_url))
-            else:
-                git_checkout_type = 'branch'
-                git_checkout = 'master'
-
-        """ task dependencies
-        """
-        new_task['uptodate'] = []
-        new_task['task_dep'] = []
-
-        if 'depends' in task_description and mode in ('build','upload'):
-            depends_subtask_name = task_description['depends']
-            new_task['task_dep'].append('{}_{}'.format(mode,depends_subtask_name))
-
-        if mode == 'git':
-            if 'git_url' in task_description:
-                new_task['actions']=[update_git(git_url,
-                                                git_checkout_type,
-                                                git_checkout)]
-            else:
-                continue
-
-        elif mode == 'build':
-            if 'shell_action' in task_description:
-                task_type = 'shell'
-            else:
-                task_type = 'dockerfile'
-            if git_url:
-                new_task['task_dep'].append('git_{}'.format(image))
-                path = "{}/{}".format(git_repos_path(git_url,git_checkout_type,git_checkout),path)
-            if task_type == 'shell':
-                if not path:
-                    path = '.'
-                new_task['actions'] = [shell_build(task_description['shell_action'],image,path=path,
-                                                   force=dodocker_config.get('no_cache',False))]
-            elif task_type == 'dockerfile':
-                pull = task_description.get('pull',False)
-                rm = task_description.get('rm',True)
-                new_task['actions'] = [docker_build(path,tag=image,dockerfile=dockerfile,pull=pull,rm=rm)]
-    
-            # tagging
-            if not 'tags' in task_description:
-                tags = []
-            else:
-                tags = task_description['tags']
-            tag = None
-            image_no_tag = image
-            if ':' in image:
-                image_no_tag, tag = image.split(':')
-            new_task['actions'].append(docker_tag(
-                image, '%s/%s' % (dodocker_config['registry_path'],image_no_tag),tag))
-            repo = tag = None
-            for t in tags:
-                if ':' in t:
-                    repo,tag = t.strip().split(':')
-                    if not repo:
-                        repo = image_no_tag
+        paramize = task_description.get('parameterization')
+        if paramize and 'shell_action' in task_description:
+            parse_errors.append('image {}: parameterization is not available with shell_actions'.format(image))
+            continue
+        if paramize and 'tags' in task_description:
+            parse_errors.append('image {}: tags parameter is not available outside of parameterization'.format(image))
+            continue
+        if not paramize:
+            paramize = [{}]
+        for paramize_item in paramize['dict_list']:
+            image = task_description['image']
+            name = '%s_%s' % (mode, task_description['image'])
+            path = str(task_description.get('path',''))
+            if not path:
+                parse_errors.append('image {}: no path given'.format(image))
+            dockerfile = task_description.get('dockerfile','Dockerfile')
+            new_task = {'basename':name, 'verbosity':0}
+            git_url = git_checkout = git_checkout_type = None
+            git_options = task_description.get('git_url',"").split()
+            if git_options:
+                git_url = git_options[0]
+                if len(git_options) == 2:
+                    try:
+                        (git_checkout_type, git_checkout) = git_options[1].split('/')
+                    except ValueError:
+                        pass
+                    if not git_checkout_type in ('branch','tags','commit'):
+                        parse_errors.append('image {}: wrong tree format {} for url {}'.format(image,git_options[1],git_url))
                 else:
-                    repo = t
-                    tag = None
-                new_task['actions'].append(docker_tag(
-                    image,'%s/%s' % (dodocker_config['registry_path'],repo) ,tag=tag))
-                new_task['actions'].append(docker_tag(image,repo ,tag=tag))
-                   
-            # IMPORTANT: image_id has to be the last action. The output of the last action is used for result_dep.
-            new_task['actions'].append(image_id(image))
-            
-            # intra build dependencies 
-            if task_description.get('file_dep'):
-                new_task['file_dep'] = [os.path.join(path,i) 
-                                    for i in task_description.get('file_dep')]
-            elif path:
-                new_task['file_dep'] = get_file_dep(path)
-            if 'depends' in task_description:
-                new_task['uptodate'].append(result_dep('%s_%s' % (mode,depends_subtask_name)))
+                    git_checkout_type = 'branch'
+                    git_checkout = 'master'
 
-            if dodocker_config.get('no_cache') and image in dodocker_config['no_cache_targets']:
-                # the image is not up to date, when the cache is disabled by the user
-                new_task['uptodate'].append(lambda x=None: False)
-            else:
-                # an image has to be available
-                new_task['uptodate'].append(check_available(image))
-            # every task has to run once to build the result_dep chain for every image
-            new_task['uptodate'].append(run_once)
-        elif mode == 'upload':
-            tag = None
-            if ':' in image:
-                image, tag = image.split(':')
-            new_task['actions'] = [docker_push('%s/%s' % (dodocker_config['registry_path'],image), tag)]
-        yield new_task
+            """ task dependencies
+            """
+            new_task['uptodate'] = []
+            new_task['task_dep'] = []
+
+            if 'depends' in task_description and mode in ('build','upload'):
+                depends_subtask_name = task_description['depends']
+                new_task['task_dep'].append('{}_{}'.format(mode,depends_subtask_name))
+
+            if mode == 'git':
+                if 'git_url' in task_description:
+                    new_task['actions']=[update_git(git_url,
+                                                    git_checkout_type,
+                                                    git_checkout)]
+                else:
+                    continue
+
+            elif mode == 'build':
+                if 'shell_action' in task_description:
+                    task_type = 'shell'
+                else:
+                    task_type = 'dockerfile'
+                if git_url:
+                    new_task['task_dep'].append('git_{}'.format(image))
+                    path = "{}/{}".format(git_repos_path(git_url,git_checkout_type,git_checkout),path)
+                if task_type == 'shell':
+                    if not path:
+                        path = '.'
+                    new_task['actions'] = [shell_build(task_description['shell_action'],image,path=path,
+                                                       force=dodocker_config.get('no_cache',False))]
+                elif task_type == 'dockerfile':
+                    pull = task_description.get('pull',False)
+                    rm = task_description.get('rm',True)
+                    new_task['actions'] = [docker_build(path,tag=image,dockerfile=dockerfile,pull=pull,rm=rm)]
+
+                # tagging
+                if not 'tags' in task_description:
+                    import pdb; pdb.set_trace()
+                    if paramize_item.get('tags'):
+                        tags = paramize_item['tags']
+                    else:
+                        tags = []
+                else:
+                    tags = task_description['tags']
+                tag = None
+                image_no_tag = image
+                if ':' in image:
+                    image_no_tag, tag = image.split(':')
+                new_task['actions'].append(docker_tag(
+                    image, '%s/%s' % (dodocker_config['registry_path'],image_no_tag),tag))
+                repo = tag = None
+                for t in tags:
+                    if ':' in t:
+                        repo,tag = t.strip().split(':')
+                        if not repo:
+                            repo = image_no_tag
+                    else:
+                        repo = t
+                        tag = None
+                    new_task['actions'].append(docker_tag(
+                        image,'%s/%s' % (dodocker_config['registry_path'],repo) ,tag=tag))
+                    new_task['actions'].append(docker_tag(image,repo ,tag=tag))
+
+                # IMPORTANT: image_id has to be the last action. The output of the last action is used for result_dep.
+                new_task['actions'].append(image_id(image))
+
+                # intra build dependencies 
+                if task_description.get('file_dep'):
+                    new_task['file_dep'] = [os.path.join(path,i) 
+                                        for i in task_description.get('file_dep')]
+                elif path:
+                    new_task['file_dep'] = get_file_dep(path)
+                if 'depends' in task_description:
+                    new_task['uptodate'].append(result_dep('%s_%s' % (mode,depends_subtask_name)))
+
+                if dodocker_config.get('no_cache') and image in dodocker_config['no_cache_targets']:
+                    # the image is not up to date, when the cache is disabled by the user
+                    new_task['uptodate'].append(lambda x=None: False)
+                else:
+                    # an image has to be available
+                    new_task['uptodate'].append(check_available(image))
+                # every task has to run once to build the result_dep chain for every image
+                new_task['uptodate'].append(run_once)
+            elif mode == 'upload':
+                tag = None
+                if ':' in image:
+                    image, tag = image.split(':')
+                new_task['actions'] = [docker_push('%s/%s' % (dodocker_config['registry_path'],image), tag)]
+            yield new_task
     if parse_errors:
         sys.exit("\n".join(parse_errors))
 
