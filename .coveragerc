@@ -1,2 +1,2 @@
 [run]
-source = dodocker, tests
+source = ./
