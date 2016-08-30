@@ -18,5 +18,5 @@ install:
 # command to run tests
 script: sudo tox
 after_success:
-  - sudo coveralls
+  - sudo coveralls --data_file tests/.coverage
 
