@@ -69,7 +69,7 @@ def check_available(image):
         return True
     return check_available_callable
 
-def docker_build(path,tag,dockerfile,pull=False,rm=True):
+def docker_build(path,tag,dockerfile,buildargs=None,pull=False,rm=True):
     def docker_build_callable():
         error = False
         print(path,tag)
@@ -189,10 +189,6 @@ def parse_dodocker_yaml(mode):
         else:
             paramized_items = [{}]
 
-
-
-
-
         image = task_description['image']
         name = '%s_%s' % (mode, task_description['image'])
         path = str(task_description.get('path',''))
@@ -254,16 +250,15 @@ def parse_dodocker_yaml(mode):
                     pull = task_description.get('pull',False)
                     rm = task_description.get('rm',True)
                     new_task['actions'] = [
-                        docker_build(path,tag=image,dockerfile=dockerfile,pull=pull,rm=rm)]
+                        docker_build(path,tag=image,dockerfile=dockerfile,buildargs=paramize_item,pull=pull,rm=rm)]
 
                 # tagging
-                if not 'tags' in task_description:
-                    if paramize_item.get('tags'):
-                        tags = paramize_item['tags']
-                    else:
-                        tags = []
-                else:
-                    tags = task_description['tags']
+                tags = []
+                if 'tags' in task_description:
+                    tags.extend(task_description['tags'])
+                if paramize_item.get('tags'):
+                    tags.extend(paramize_item['tags'])
+                    
                 tag = None
                 image_no_tag = image
                 if ':' in image:
