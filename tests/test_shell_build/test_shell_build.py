@@ -2,7 +2,7 @@ from dodocker import run_dodocker_cli
 import os, pytest
 
 class TestShellBuild:
-    def test_build(self,tmpdir_copy):
+    def test_1st_build(self,tmpdir_copy):
         with tmpdir_copy.as_cwd():
             run_dodocker_cli(['-o','output.txt','build'])
         output = tmpdir_copy.join('output.txt').open().read()
