@@ -1,0 +1,5 @@
+dodocker
+docker-py>1.3.0,<2
+PyYAML>3.11.0,<4
+GitPython<3
+doit==0.29
