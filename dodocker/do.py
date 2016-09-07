@@ -2,18 +2,6 @@
 ======================================================================
 dodocker. A build tool for independent docker images and registries.
 Copyright (C) 2014-2016  n@work Internet Informationssysteme GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ======================================================================
 """
 
@@ -69,9 +57,9 @@ def docker_build(path,tag,dockerfile,pull=False,rm=True):
         print(path,tag)
         for line in doc.build(path,tag=tag,stream=True,pull=pull,dockerfile=dockerfile,
                               rm=rm,nocache=dodocker_config.get('no_cache',False)):
-            line_parsed = json.loads(line)
+            line_parsed = json.loads(line.decode('utf-8'))
             if 'stream' in line_parsed:
-                sys.stdout.write(line_parsed['stream'].encode('utf8'))
+                sys.stdout.write(line_parsed['stream'])
             if line_parsed.get('errorDetail'):
                 sys.stdout.write(line_parsed['errorDetail']['message']+'\n')
                 error = True
@@ -105,7 +93,7 @@ def docker_push(repository,tag):
         except docker.errors.DockerException as e:
             sys.exit(e)
         for line in result:
-            line_parsed = json.loads(line)
+            line_parsed = json.loads(line.decode('utf-8'))
             if 'status' in line_parsed:
                 sys.stdout.write(line_parsed['status']+'\n')
             if line_parsed.get('errorDetail'):
@@ -125,7 +113,7 @@ def get_file_dep(path):
     return file_list
 
 def git_repos_path(url,checkout_type, checkout):
-    return "dodocker_repos/{}".format(hashlib.md5(".".join((url,checkout_type,checkout))).hexdigest())
+    return "dodocker_repos/{}".format(hashlib.md5(".".join((url,checkout_type,checkout)).encode('utf-8')).hexdigest())
 
 def update_git(git_url, checkout_type, checkout):
     def update_git_callable():
