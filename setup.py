@@ -3,13 +3,13 @@
 from setuptools import setup, find_packages
 setup(
     name = "dodocker",
-    version = "0.5",
+    version = "1.0a",
     zip_safe = True,
     packages = find_packages(),
-    install_requires = ['docker-py>=1.3.0,<2',
-                        'PyYAML>=3.11,<4',
-                        'doit==0.29',
-                        'GitPython==1.0.1',
+    install_requires = ['docker-py',
+                        'PyYAML',
+                        'doit',
+                        'GitPython',
                         ],
     package_data = {},
     author = 'Andreas Elvers',
