@@ -41,6 +41,12 @@ doc = docker.Client(base_url='unix://var/run/docker.sock',
                     timeout=10)
 dodocker_config = {}
 
+"""
+===============================
+Action and Dependency functions
+===============================
+"""
+
 def image_id(image):
     def image_id_callable():
         try:
@@ -153,6 +159,12 @@ def update_git(git_url, checkout_type, checkout):
             print("done git clone {}".format(git_url))
         return not error
     return update_git_callable
+
+"""
+======================
+dodocker.yaml parser
+======================
+"""
 
 def parse_dodocker_yaml(mode):
     parse_errors = []
@@ -283,6 +295,12 @@ def task_git():
                'actions': None,
                'task_dep': all_build_tasks}
 
+"""
+==============================
+D O I T - M A I N  - T A S K S
+==============================
+"""
+
 def task_build():
     all_build_tasks = []
     for task in parse_dodocker_yaml('build'):
@@ -314,16 +332,21 @@ def task_build_dump():
     return {'actions':[build_dump],
             'verbosity':2}
 
+"""
+========================
+Config related functions
+========================
+"""
+
 import doit
 LICENSE_TEXT = """
 dodocker (c) 2014-2016 n@work Internet Informationssysteme GmbH
-written by Andreas Elvers - based on doit by Eduardo Schettino.
+written by Andreas Elvers - powered by doit by Eduardo Schettino.
 
-This program comes with ABSOLUTELY NO WARRANTY
-This is free software, and you are welcome to redistribute it
-under certain conditions. See this link for more information:
-http://www.gnu.org/licenses/gpl-3.0.en.html
-
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+        http://www.apache.org/licenses/LICENSE-2.0
 """
 
 def load_dodocker_config():
@@ -354,6 +377,12 @@ def config_list():
     config = load_dodocker_config()
     for key in config:
         print('{} : {}'.format(key,config[key]))
+
+"""
+===============================
+Argument parsing and processing
+===============================
+"""
 
 def process_args(parsed,unparsed):
     if parsed.yamldir:
@@ -454,6 +483,12 @@ def create_parser():
         'quickstart',
         help='populate an empty directory with the quickstart project')
     return parser
+
+"""
+============
+Entry points
+============
+"""
 
 def run_dodocker_cli(args):
     # helper function for external programs like tests
