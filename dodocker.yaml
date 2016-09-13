@@ -18,6 +18,6 @@
       - debian_version: 1.11.2-0~jessie
         tag: 1.11.2
       - debian_version: 1.12.1-0~jessie
-        tag: 1.12.1
+        tag: [latest, 1.12.1]
     build_param: [debian_version]
-    tags_by_param: tag
+
