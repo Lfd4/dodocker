@@ -5,9 +5,9 @@
       - a: one
         b: two
         c: three
-        tags:[v1]
+        tags: [v1]
       - b: no_default
-        tags:[v2]
+        tags: [v2]
       - a: eins
         b: zwei
         c: drei
