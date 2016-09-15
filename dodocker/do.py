@@ -291,7 +291,8 @@ def parse_dodocker_yaml(mode):
                     new_task['uptodate'].append(result_dep('%s_%s' % (mode,depends_subtask_name)))
 
                 if dodocker_config.get('no_cache') and image in dodocker_config['no_cache_targets']:
-                    # the image is not up to date, when the cache is disabled by the user
+                    # the image is not up to date when the cache is disabled by the user
+                    # thus return always False
                     new_task['uptodate'].append(lambda x=None: False)
                 else:
                     # an image has to be available
