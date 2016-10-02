@@ -69,11 +69,11 @@ def check_available(image):
         return True
     return check_available_callable
 
-def docker_build(path,tag,dockerfile,buildargs=None,pull=False,rm=True):
+def docker_build(path,image_name,dockerfile,buildargs=None,pull=False,rm=True):
     def docker_build_callable():
         error = False
-        print(path,tag)
-        for line in doc.build(path,tag=tag,stream=True,pull=pull,dockerfile=dockerfile,
+        print(path,image_name,buildargs)
+        for line in doc.build(path,tag=image_name,stream=True,pull=pull,dockerfile=dockerfile,
                               rm=rm,nocache=dodocker_config.get('no_cache',False)):
             line_parsed = json.loads(line.decode('utf-8'))
             if 'stream' in line_parsed:
@@ -173,21 +173,11 @@ def parse_dodocker_yaml(mode):
             yaml_data = yaml.safe_load(f)
     except IOError:
         sys.exit('No dodocker.yaml found')
+
+    # loop over tasks
     for task_description in yaml_data:
-        paramize = task_description.get('parameterization')
-        if paramize:
-            if 'shell_action' in task_description:
-                parse_errors.append('image {}: parameterization is not available with shell_actions'.format(image))
-                continue
-            if 'tags' in task_description:
-                parse_errors.append('image {}: tags parameter is not available outside of parameterization'.format(image))
-                continue
+
         # general task attributes
-            
-        if paramize:
-            paramized_items = paramize['dict_list']
-        else:
-            paramized_items = [{}]
 
         image = task_description['image']
         name = '%s_%s' % (mode, task_description['image'])
@@ -196,6 +186,30 @@ def parse_dodocker_yaml(mode):
             parse_errors.append('image {}: no path given'.format(image))
         dockerfile = task_description.get('dockerfile','Dockerfile')
         new_task = {'basename':name, 'verbosity':0}
+
+
+        paramize = task_description.get('parameterization')
+        if paramize:
+            if not paramize['mode'] == 'fixed':
+                parse_error.append('image {}: parameterization is currently only supported with fixed parameter sets'.format(image))
+                continue
+            if 'shell_action' in task_description:
+                parse_errors.append('image {}: parameterization is not available with shell_actions'.format(image))
+                continue
+            if 'tags' in task_description:
+                parse_errors.append('image {}: tags parameter is not available outside of parameterization'.format(image))
+                continue
+            if ':' in image:
+                parse_errors.append('image {}: tag in image name not allowed with parameterization'.format(image))
+                continue
+            if len([i for i in paramize['setup'] if 'tags' in i]) != len(paramize['setup']):
+                parse_errors.append('image {}: every parameterization item must provide a tags attribute'.format(image))
+            
+        if paramize:
+            paramized_items = paramize['setup']
+        else:
+            paramized_items = [{}]
+
         git_url = git_checkout = git_checkout_type = None
         git_options = task_description.get('git_url',"").split()
         if git_options:
@@ -229,7 +243,8 @@ def parse_dodocker_yaml(mode):
                 continue
 
         elif mode == 'build':
-            for paramize_item in paramized_items:
+            new_task['actions'] = []
+            for paramize_run in paramized_items:
                 if 'shell_action' in task_description:
                     task_type = 'shell'
                 else:
@@ -243,28 +258,33 @@ def parse_dodocker_yaml(mode):
                 if task_type == 'shell':
                     if not path:
                         path = '.'
-                    new_task['actions'] = [
+                    new_task['actions'].append(
                         shell_build(task_description['shell_action'],image,path=path,
-                                    force=dodocker_config.get('no_cache',False))]
+                                    force=dodocker_config.get('no_cache',False)))
                 elif task_type == 'dockerfile':
+                    buildargs = [(str(k),str(v)) for k,v in paramize_run.items() if not k == 'tags']
                     pull = task_description.get('pull',False)
                     rm = task_description.get('rm',True)
-                    new_task['actions'] = [
-                        docker_build(path,tag=image,dockerfile=dockerfile,buildargs=paramize_item,pull=pull,rm=rm)]
+                    tmp_image_name = image + ':' + hashlib.md5(
+                        str(sorted(buildargs,key=lambda a:a[0])).encode('utf-8')).hexdigest()
+                    new_task['actions'].append(
+                        docker_build(path,image_name=tmp_image_name,
+                                     dockerfile=dockerfile,
+                                     buildargs=buildargs,pull=pull,rm=rm))
 
                 # tagging
                 tags = []
                 if 'tags' in task_description:
                     tags.extend(task_description['tags'])
-                if paramize_item.get('tags'):
-                    tags.extend(paramize_item['tags'])
+                if paramize_run.get('tags'):
+                    tags.extend(paramize_run['tags'])
                     
                 tag = None
                 image_no_tag = image
                 if ':' in image:
                     image_no_tag, tag = image.split(':')
                 new_task['actions'].append(docker_tag(
-                    image, '%s/%s' % (dodocker_config['registry_path'],image_no_tag),tag))
+                    tmp_image_name, '%s/%s' % (dodocker_config['registry_path'],image_no_tag),tag))
                 repo = tag = None
                 for t in tags:
                     if ':' in t:
@@ -275,11 +295,14 @@ def parse_dodocker_yaml(mode):
                         repo = t
                         tag = None
                     new_task['actions'].append(docker_tag(
-                        image,'%s/%s' % (dodocker_config['registry_path'],repo) ,tag=tag))
-                    new_task['actions'].append(docker_tag(image,repo ,tag=tag))
+                        tmp_image_name,'%s/%s' % (dodocker_config['registry_path'],repo) ,tag=tag))
+                    new_task['actions'].append(docker_tag(tmp_image_name,repo ,tag=tag))
 
-                # IMPORTANT: image_id has to be the last action. The output of the last action is used for result_dep.
-                new_task['actions'].append(image_id(image))
+                """ IMPORTANT: 
+                    image_id has to be the last action. The output of the last action is 
+                    used for result_dep by doit
+                """
+                new_task['actions'].append(image_id(tmp_image_name))
 
                 # intra build dependencies 
                 if task_description.get('file_dep'):
@@ -290,13 +313,15 @@ def parse_dodocker_yaml(mode):
                 if 'depends' in task_description:
                     new_task['uptodate'].append(result_dep('%s_%s' % (mode,depends_subtask_name)))
 
-                if dodocker_config.get('no_cache') and image in dodocker_config['no_cache_targets']:
+                if ( dodocker_config.get('no_cache') and
+                     ( not dodocker_config['no_cache_targets'] or
+                       image in dodocker_config['no_cache_targets'] )):
                     # the image is not up to date when the cache is disabled by the user
                     # thus return always False
                     new_task['uptodate'].append(lambda x=None: False)
                 else:
                     # an image has to be available
-                    new_task['uptodate'].append(check_available(image))
+                    new_task['uptodate'].append(check_available(tmp_image_name))
                 # every task has to run once to build the result_dep chain for every image
                 new_task['uptodate'].append(run_once)
         elif mode == 'upload':
@@ -427,8 +452,7 @@ def process_args(parsed,unparsed):
             sys.argv.append(parsed.subcommand)
     if parsed.subcommand == 'build' and parsed.no_cache:
         dodocker_config['no_cache'] = True
-        if parsed.targets:
-            dodocker_config['no_cache_targets'] = parsed.targets
+        dodocker_config['no_cache_targets'] = parsed.targets
 
     elif parsed.subcommand == 'doit':
         sys.argv.extend(unparsed)
@@ -459,7 +483,7 @@ def create_parser():
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-c', dest='configfile',
                         metavar='config file',
-                        help='use this docker config file')
+                        help='use this dodocker config file')
     parser.add_argument('-d', dest='yamldir',
                         metavar='directory',
                         help='this directory contains the dodocker.yaml file')
@@ -479,7 +503,8 @@ def create_parser():
                               dest='parallel',help='number of tasks run in parallel')
     build_parser.add_argument('--no-cache', action='store_true', help='do a docker build without using the cache')
     
-    build_parser.add_argument('targets',metavar='target',nargs='*',help='list of targets to build')
+    build_parser.add_argument('targets',metavar='target',nargs='*',help='list of targets to build',
+                              default=[])
     upload_parser = subparsers.add_parser(
         'upload',
         help='upload built images to registry')
