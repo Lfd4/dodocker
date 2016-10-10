@@ -1,7 +1,8 @@
 - image: dodockertest/paramtest1
   path: image1
   parameterization:
-    dict_list:
+    mode: fixed
+    setup:
       - a: one
         b: two
         c: three

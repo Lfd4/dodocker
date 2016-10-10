@@ -10,12 +10,13 @@
 - image: dodocker:bla_is_an_error
   path: .
   parameterization:
-    dict_list:
+    mode: list_of_dicts
+    setup:
       - debian_version: 1.9.1-0~jessie
-        tags: [ :1.9.1 ]
+        tags: [ ':1.9.1' ]
       - debian_version: 1.10.3-0~jessie
-        tags: [ :1.10.3 ]
+        tags: [ ':1.10.3' ]
       - debian_version: 1.11.2-0~jessie
-        tags: [ :1.11.2 ]
+        tags: [ ':1.11.2' ]
       - debian_version: 1.12.1-0~jessie
-        tag: [ :latest, :1.12.1 ]
+        tag: [ ':latest', ':1.12.1' ]

@@ -166,6 +166,126 @@ dodocker.yaml parser
 ======================
 """
 
+class DodockerParseError(Exception):
+    pass
+        
+class TaskInfo:
+    pass
+
+class TaskGroup:
+    def __init__(self):
+        self.task_descriptions = None
+    def load_task_description_file(self, filename='dodocker.yaml'):
+        try:
+            with open('dodocker.yaml','r') as f:
+                self.load_task_description(f.read())
+        except IOError:
+            sys.exit('No dodocker.yaml found')
+        self.task_descriptions = yaml_data
+    def load_task_descriptions(self, yaml_data):
+        self.task_descriptions = yaml.safe_load(yaml_data)
+    def create_group_data(self):
+        parse_errors = []
+        for i in self.task_descriptions:
+            try:
+                yield self.create_task_data(i)
+            except DodockerParseError as e:
+                parse_errors.extend(e.args)
+        if parse_errors:
+            raise DodockerParseError(*parse_errors)
+        
+    def create_task_data(self,task_description):
+        # parameterization
+        paramize = task_description.get('parameterization')
+        if paramize:
+            paramized_items = paramize['setup']
+        else:
+            paramized_items = [{}]
+        for paramize_run in paramized_items:
+
+            # general task attributes
+
+            t = TaskInfo()
+
+            t.image = task_description['image']
+            
+            t.path = str(task_description.get('path',''))
+            if 'shell_action' in task_description:
+                t.task_type = 'shell'
+            else:
+                t.task_type = 'dockerfile'
+            if not t.path:
+                raise DodockerParseError('image {}: no path given'.format(t.image))
+            t.dockerfile = task_description.get('dockerfile','Dockerfile')
+
+            t.paramize = task_description.get('parameterization')
+            if t.paramize:
+                if not t.paramize['mode'] == 'fixed':
+                    raise DodockerParseError('image {}: parameterization is currently only supported with fixed parameter sets'.format(t.image))
+                if 'shell_action' in task_description:
+                    raise DodockerParseError('image {}: parameterization is not available with shell_actions'.format(t.image))
+                    continue
+                if 'tags' in task_description:
+                    raise DodockerParseError('image {}: tags parameter is not available outside of parameterization'.format(t.image))
+                    continue
+                if ':' in image:
+                    raise DodockerParseError('image {}: tag in image name not allowed with parameterization'.format(t.image))
+                    continue
+                if len([i for i in t.paramize['setup'] if not 'tags' in i]) != len(t.paramize['setup']):
+                    raise DodockerParseError('image {}: every parameterization item must provide a tags attribute'.format(t.image))
+
+
+            t.git_url = git_checkout = git_checkout_type = None
+            t.git_options = task_description.get('git_url',"").split()
+            if t.git_options:
+                t.git_url = t.git_options[0]
+                if len(t.git_options) == 2:
+                    try:
+                        (t.git_checkout_type, t.git_checkout) = t.git_options[1].split('/')
+                    except ValueError:
+                        pass
+                    if not t.git_checkout_type in ('branch','tags','commit'):
+                        raise DodockerParseError('image {}: wrong tree format {} for url {}'.format(t.image,t.git_options[1],t.git_url))
+                else:
+                    t.git_checkout_type = 'branch'
+                    t.git_checkout = 'master'
+                t.path = os.path.join(git_repos_path(t.git_url,
+                                                     t.git_checkout_type,
+                                                     t.git_checkout)
+                                      ,t.path)
+
+            t.depends_subtask_name = task_description.get('depends')
+
+            if t.task_type == 'dockerfile':
+                t.buildargs = [(str(k),str(v)) for k,v in paramize_run.items() if not k == 'tags']
+                t.pull = task_description.get('pull',False)
+                t.rm = task_description.get('rm',True)
+
+            unprocessed_tags = []
+            if 'tags' in task_description:
+                unprocessed_tags.extend(task_description['tags'])
+            if paramize_run.get('tags'):
+                unprocessed_tags.extend(paramize_run['tags'])
+
+            tag = None
+            t.bare_image_name = t.image
+            if ':' in t.image:
+                t.bare_image_name, tag = image.split(':')
+            if tag:
+                unprocessed_tags.prepend(':'+tag)
+            repo = tag = None
+            t.tags = []
+            for t in unprocessed_tags:
+                if ':' in t:
+                    repo,tag = t.strip().split(':')
+                    if not repo:
+                        repo = bare_image_name
+                else:
+                    repo = t
+                    tag = None
+                t.tags.append((repo,tag))
+        return t                
+
 def parse_dodocker_yaml(mode):
     parse_errors = []
     try:
@@ -180,12 +300,12 @@ def parse_dodocker_yaml(mode):
         # general task attributes
 
         image = task_description['image']
-        name = '%s_%s' % (mode, task_description['image'])
+        task_name = '%s_%s' % (mode, task_description['image'])
         path = str(task_description.get('path',''))
         if not path:
             parse_errors.append('image {}: no path given'.format(image))
         dockerfile = task_description.get('dockerfile','Dockerfile')
-        new_task = {'basename':name, 'verbosity':0}
+        new_task = {'basename':task_name, 'verbosity':0}
 
 
         paramize = task_description.get('parameterization')
