@@ -41,14 +41,15 @@ class TaskGroup:
         self.task_descriptions = yaml.safe_load(yaml_data)
     def create_group_data(self):
         parse_errors = []
+        group_tags = set()
         for i in self.task_descriptions:
             try:
-                group_tags = set()
                 for task in self.create_task_data(i):
                     intersect = group_tags.intersection(set(task.tags)) 
                     if intersect:
                         raise DodockerParseError(
                             'Duplicated name:tags are not allowed. Offending name:tags are {}'.format(intersect))
+                    group_tags.update(task.tags)
                     yield task
             except DodockerParseError as e:
                 parse_errors.extend(e.args)
