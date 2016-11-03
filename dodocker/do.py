@@ -35,6 +35,7 @@ from distutils.dir_util import copy_tree
 import docker
 import subprocess
 import git
+from dodocker.parser import TaskGroup
 
 doc = docker.Client(base_url='unix://var/run/docker.sock',
                     version='1.17',
@@ -160,131 +161,92 @@ def update_git(git_url, checkout_type, checkout):
         return not error
     return update_git_callable
 
-"""
-======================
-dodocker.yaml parser
-======================
-"""
 
-class DodockerParseError(Exception):
-    pass
-        
-class TaskInfo:
-    pass
+def create_doit_tasks(mode, task_list):
 
-class TaskGroup:
-    def __init__(self):
-        self.task_descriptions = None
-    def load_task_description_file(self, filename='dodocker.yaml'):
-        try:
-            with open('dodocker.yaml','r') as f:
-                self.load_task_description(f.read())
-        except IOError:
-            sys.exit('No dodocker.yaml found')
-        self.task_descriptions = yaml_data
-    def load_task_descriptions(self, yaml_data):
-        self.task_descriptions = yaml.safe_load(yaml_data)
-    def create_group_data(self):
-        parse_errors = []
-        for i in self.task_descriptions:
-            try:
-                yield self.create_task_data(i)
-            except DodockerParseError as e:
-                parse_errors.extend(e.args)
-        if parse_errors:
-            raise DodockerParseError(*parse_errors)
-        
-    def create_task_data(self,task_description):
-        # parameterization
-        paramize = task_description.get('parameterization')
-        if paramize:
-            paramized_items = paramize['setup']
-        else:
-            paramized_items = [{}]
-        for paramize_run in paramized_items:
+    # loop over tasks
+    for dodocker_task in task_list:
+        ddtask = dodocker_task
+        # general task attributes
 
-            # general task attributes
+        doit_task_name = '%s_%s' % (mode, ddtask['image'])
+        doit_task = {'basename':doit_task_name, 'verbosity':0}
 
-            t = TaskInfo()
 
-            t.image = task_description['image']
-            
-            t.path = str(task_description.get('path',''))
-            if 'shell_action' in task_description:
-                t.task_type = 'shell'
+        """ task dependencies
+        """
+        doit_task['uptodate'] = []
+        doit_task['task_dep'] = []
+
+        if ddtask.depends_subtask_name and mode in ('build','upload'):
+            doit_task['task_dep'].append('{}_{}'.format(mode,ddtask.depends_subtask_name))
+
+        if mode == 'git':
+            if ddtask.git_url:
+                doit_task['actions']=[update_git(ddtask.git_url,
+                                                ddtask.git_checkout_type,
+                                                ddtask.git_checkout)]
             else:
-                t.task_type = 'dockerfile'
-            if not t.path:
-                raise DodockerParseError('image {}: no path given'.format(t.image))
-            t.dockerfile = task_description.get('dockerfile','Dockerfile')
+                continue
 
-            t.paramize = task_description.get('parameterization')
-            if t.paramize:
-                if not t.paramize['mode'] == 'fixed':
-                    raise DodockerParseError('image {}: parameterization is currently only supported with fixed parameter sets'.format(t.image))
-                if 'shell_action' in task_description:
-                    raise DodockerParseError('image {}: parameterization is not available with shell_actions'.format(t.image))
-                    continue
-                if 'tags' in task_description:
-                    raise DodockerParseError('image {}: tags parameter is not available outside of parameterization'.format(t.image))
-                    continue
-                if ':' in image:
-                    raise DodockerParseError('image {}: tag in image name not allowed with parameterization'.format(t.image))
-                    continue
-                if len([i for i in t.paramize['setup'] if not 'tags' in i]) != len(t.paramize['setup']):
-                    raise DodockerParseError('image {}: every parameterization item must provide a tags attribute'.format(t.image))
+        elif mode == 'build':
+            doit_task['actions'] = []
 
+            if git_url:
+                doit_task['task_dep'].append('git_{}'.format(ddtask.image))
+                path = "{}/{}".format(git_repos_path(ddtask.git_url,
+                                                     ddtask.git_checkout_type,
+                                                     ddtask.git_checkout)
+                                      ,ddtask.path)
+            if ddtask.task_type == 'shell':
+                doit_task['actions'].append(
+                    shell_build(ddtask.shell_action, ddtask.image, path=ddtask.path,
+                                force=dodocker_config.get('no_cache',False)))
+            elif ddtask.task_type == 'dockerfile':
+                image_name = ':'.join(ddtask.tags.pop(0))
+                doit_task['actions'].append(
+                    docker_build(ddtask.path, image_name=image_name,
+                                 dockerfile=ddtask.dockerfile,
+                                 buildargs=ddtask.buildargs, pull=ddtask.pull,rm=ddtask.rm))
 
-            t.git_url = git_checkout = git_checkout_type = None
-            t.git_options = task_description.get('git_url',"").split()
-            if t.git_options:
-                t.git_url = t.git_options[0]
-                if len(t.git_options) == 2:
-                    try:
-                        (t.git_checkout_type, t.git_checkout) = t.git_options[1].split('/')
-                    except ValueError:
-                        pass
-                    if not t.git_checkout_type in ('branch','tags','commit'):
-                        raise DodockerParseError('image {}: wrong tree format {} for url {}'.format(t.image,t.git_options[1],t.git_url))
-                else:
-                    t.git_checkout_type = 'branch'
-                    t.git_checkout = 'master'
-                t.path = os.path.join(git_repos_path(t.git_url,
-                                                     t.git_checkout_type,
-                                                     t.git_checkout)
-                                      ,t.path)
+            for image_no_tag, tag in ddtask.tags: 
+                doit_task['actions'].append(docker_tag(
+                    tmp_image_name, '%s/%s' % (dodocker_config['registry_path'],image_no_tag),tag))
+            """ IMPORTANT: 
+                image_id has to be the last action. The output of the last action is 
+                used for result_dep by doit
+            """
+            doit_task['actions'].append(image_id(tmp_image_name))
 
-            t.depends_subtask_name = task_description.get('depends')
+            # intra build dependencies 
+            if task_description.get('file_dep'):
+                new_task['file_dep'] = [os.path.join(path,i) 
+                                    for i in task_description.get('file_dep')]
+            elif path:
+                new_task['file_dep'] = get_file_dep(path)
+            if 'depends' in task_description:
+                new_task['uptodate'].append(result_dep('%s_%s' % (mode,depends_subtask_name)))
 
-            if t.task_type == 'dockerfile':
-                t.buildargs = [(str(k),str(v)) for k,v in paramize_run.items() if not k == 'tags']
-                t.pull = task_description.get('pull',False)
-                t.rm = task_description.get('rm',True)
-
-            unprocessed_tags = []
-            if 'tags' in task_description:
-                unprocessed_tags.extend(task_description['tags'])
-            if paramize_run.get('tags'):
-                unprocessed_tags.extend(paramize_run['tags'])
-
+            if ( dodocker_config.get('no_cache') and
+                 ( not dodocker_config['no_cache_targets'] or
+                   image in dodocker_config['no_cache_targets'] )):
+                # the image is not up to date when the cache is disabled by the user
+                # thus return always False
+                new_task['uptodate'].append(lambda x=None: False)
+            else:
+                # an image has to be available
+                new_task['uptodate'].append(check_available(tmp_image_name))
+            # every task has to run once to build the result_dep chain for every image
+            new_task['uptodate'].append(run_once)
+        elif mode == 'upload':
             tag = None
-            t.bare_image_name = t.image
-            if ':' in t.image:
-                t.bare_image_name, tag = image.split(':')
-            if tag:
-                unprocessed_tags.prepend(':'+tag)
-            repo = tag = None
-            t.tags = []
-            for t in unprocessed_tags:
-                if ':' in t:
-                    repo,tag = t.strip().split(':')
-                    if not repo:
-                        repo = bare_image_name
-                else:
-                    repo = t
-                    tag = None
-                t.tags.append((repo,tag))
-        return t                
+            if ':' in image:
+                image, tag = image.split(':')
+            new_task['actions'] = [docker_push('%s/%s' % (dodocker_config['registry_path'],image), tag)]
+        yield new_task
+    if parse_errors:
+        sys.exit("\n".join(parse_errors))
+
 
 def parse_dodocker_yaml(mode):
     parse_errors = []
@@ -308,22 +270,22 @@ def parse_dodocker_yaml(mode):
         new_task = {'basename':task_name, 'verbosity':0}
 
 
-        paramize = task_description.get('parameterization')
+        paramize = task_description.get('parameter')
         if paramize:
             if not paramize['mode'] == 'fixed':
-                parse_error.append('image {}: parameterization is currently only supported with fixed parameter sets'.format(image))
+                parse_error.append('image {}: parameter is currently only supported with fixed parameter sets'.format(image))
                 continue
             if 'shell_action' in task_description:
-                parse_errors.append('image {}: parameterization is not available with shell_actions'.format(image))
+                parse_errors.append('image {}: parameter is not available with shell_actions'.format(image))
                 continue
             if 'tags' in task_description:
-                parse_errors.append('image {}: tags parameter is not available outside of parameterization'.format(image))
+                parse_errors.append('image {}: tags parameter is not available outside of parameter'.format(image))
                 continue
             if ':' in image:
-                parse_errors.append('image {}: tag in image name not allowed with parameterization'.format(image))
+                parse_errors.append('image {}: tag in image name not allowed with parameter'.format(image))
                 continue
             if len([i for i in paramize['setup'] if 'tags' in i]) != len(paramize['setup']):
-                parse_errors.append('image {}: every parameterization item must provide a tags attribute'.format(image))
+                parse_errors.append('image {}: every parameter item must provide a tags attribute'.format(image))
             
         if paramize:
             paramized_items = paramize['setup']
