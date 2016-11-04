@@ -35,6 +35,7 @@ from distutils.dir_util import copy_tree
 import docker
 import subprocess
 import git
+from . import parser
 from dodocker.parser import TaskGroup
 
 doc = docker.Client(base_url='unix://var/run/docker.sock',
@@ -169,7 +170,7 @@ def create_doit_tasks(mode, task_list):
         ddtask = dodocker_task
         # general task attributes
 
-        doit_task_name = '%s_%s' % (mode, ddtask['image'])
+        doit_task_name = '{}_{}'.format(mode, ddtask.doit_image_name)
         doit_task = {'basename':doit_task_name, 'verbosity':0}
 
 
@@ -192,238 +193,67 @@ def create_doit_tasks(mode, task_list):
         elif mode == 'build':
             doit_task['actions'] = []
 
-            if git_url:
-                doit_task['task_dep'].append('git_{}'.format(ddtask.image))
+            if ddtask.git_url:
+                doit_task['task_dep'].append('git_{}'.format(ddtask.doit_image_name))
                 path = "{}/{}".format(git_repos_path(ddtask.git_url,
                                                      ddtask.git_checkout_type,
                                                      ddtask.git_checkout)
                                       ,ddtask.path)
             if ddtask.task_type == 'shell':
                 doit_task['actions'].append(
-                    shell_build(ddtask.shell_action, ddtask.image, path=ddtask.path,
+                    shell_build(ddtask.shell_action, ddtask.doit_image_name, path=ddtask.path,
                                 force=dodocker_config.get('no_cache',False)))
             elif ddtask.task_type == 'dockerfile':
-                image_name = ':'.join(ddtask.tags.pop(0))
+                """ 
+                the first name:tag pair is used for the build and
+                available in ddtask.doit_image_name. So pop it to avoid tagging with itself.
+                """
+                ddtask.tags.pop(0) 
                 doit_task['actions'].append(
-                    docker_build(ddtask.path, image_name=image_name,
+                    docker_build(ddtask.path, image_name=ddtask.doit_image_name,
                                  dockerfile=ddtask.dockerfile,
                                  buildargs=ddtask.buildargs, pull=ddtask.pull,rm=ddtask.rm))
 
             for image_no_tag, tag in ddtask.tags: 
                 doit_task['actions'].append(docker_tag(
-                    tmp_image_name, '%s/%s' % (dodocker_config['registry_path'],image_no_tag),tag))
+                    ddtask.doit_image_name,
+                    '%s/%s' % (dodocker_config['registry_path'],image_no_tag),
+                    tag))
             """ IMPORTANT: 
                 image_id has to be the last action. The output of the last action is 
                 used for result_dep by doit
             """
-            doit_task['actions'].append(image_id(tmp_image_name))
+            doit_task['actions'].append(image_id(ddtask.doit_image_name))
 
             # intra build dependencies 
-            if task_description.get('file_dep'):
-                new_task['file_dep'] = [os.path.join(path,i) 
-                                    for i in task_description.get('file_dep')]
-            elif path:
-                new_task['file_dep'] = get_file_dep(path)
-            if 'depends' in task_description:
-                new_task['uptodate'].append(result_dep('%s_%s' % (mode,depends_subtask_name)))
-
+            if ddtask.file_dep:
+                doit_task['file_dep'] = [os.path.join(ddtask.path,i) for i in ddtask.file_dep]
+            elif ddtask.path:
+                doit_task['file_dep'] = get_file_dep(ddtask.path)
+            if ddtask.depends_subtask_name:
+                doit_task['uptodate'].append(result_dep('%s_%s' % (mode,ddtask.depends_subtask_name)))
             if ( dodocker_config.get('no_cache') and
                  ( not dodocker_config['no_cache_targets'] or
-                   image in dodocker_config['no_cache_targets'] )):
+                   ddtask.doit_image_name in dodocker_config['no_cache_targets'] )):
                 # the image is not up to date when the cache is disabled by the user
                 # thus return always False
-                new_task['uptodate'].append(lambda x=None: False)
+                doit_task['uptodate'].append(lambda x=None: False)
             else:
                 # an image has to be available
-                new_task['uptodate'].append(check_available(tmp_image_name))
+                doit_task['uptodate'].append(check_available(ddtask.doit_image_name))
             # every task has to run once to build the result_dep chain for every image
-            new_task['uptodate'].append(run_once)
+            doit_task['uptodate'].append(run_once)
         elif mode == 'upload':
             tag = None
-            if ':' in image:
-                image, tag = image.split(':')
-            new_task['actions'] = [docker_push('%s/%s' % (dodocker_config['registry_path'],image), tag)]
-        yield new_task
-    if parse_errors:
-        sys.exit("\n".join(parse_errors))
-
-
-def parse_dodocker_yaml(mode):
-    parse_errors = []
-    try:
-        with open('dodocker.yaml','r') as f:
-            yaml_data = yaml.safe_load(f)
-    except IOError:
-        sys.exit('No dodocker.yaml found')
-
-    # loop over tasks
-    for task_description in yaml_data:
-
-        # general task attributes
-
-        image = task_description['image']
-        task_name = '%s_%s' % (mode, task_description['image'])
-        path = str(task_description.get('path',''))
-        if not path:
-            parse_errors.append('image {}: no path given'.format(image))
-        dockerfile = task_description.get('dockerfile','Dockerfile')
-        new_task = {'basename':task_name, 'verbosity':0}
-
-
-        paramize = task_description.get('parameter')
-        if paramize:
-            if not paramize['mode'] == 'fixed':
-                parse_error.append('image {}: parameter is currently only supported with fixed parameter sets'.format(image))
-                continue
-            if 'shell_action' in task_description:
-                parse_errors.append('image {}: parameter is not available with shell_actions'.format(image))
-                continue
-            if 'tags' in task_description:
-                parse_errors.append('image {}: tags parameter is not available outside of parameter'.format(image))
-                continue
-            if ':' in image:
-                parse_errors.append('image {}: tag in image name not allowed with parameter'.format(image))
-                continue
-            if len([i for i in paramize['setup'] if 'tags' in i]) != len(paramize['setup']):
-                parse_errors.append('image {}: every parameter item must provide a tags attribute'.format(image))
-            
-        if paramize:
-            paramized_items = paramize['setup']
-        else:
-            paramized_items = [{}]
-
-        git_url = git_checkout = git_checkout_type = None
-        git_options = task_description.get('git_url',"").split()
-        if git_options:
-            git_url = git_options[0]
-            if len(git_options) == 2:
-                try:
-                    (git_checkout_type, git_checkout) = git_options[1].split('/')
-                except ValueError:
-                    pass
-                if not git_checkout_type in ('branch','tags','commit'):
-                    parse_errors.append('image {}: wrong tree format {} for url {}'.format(image,git_options[1],git_url))
-            else:
-                git_checkout_type = 'branch'
-                git_checkout = 'master'
-
-        """ task dependencies
-        """
-        new_task['uptodate'] = []
-        new_task['task_dep'] = []
-
-        if 'depends' in task_description and mode in ('build','upload'):
-            depends_subtask_name = task_description['depends']
-            new_task['task_dep'].append('{}_{}'.format(mode,depends_subtask_name))
-
-        if mode == 'git':
-            if 'git_url' in task_description:
-                new_task['actions']=[update_git(git_url,
-                                                git_checkout_type,
-                                                git_checkout)]
-            else:
-                continue
-
-        elif mode == 'build':
-            new_task['actions'] = []
-            for paramize_run in paramized_items:
-                if 'shell_action' in task_description:
-                    task_type = 'shell'
+            for name_tag in ddtask.tags:
+                if ':' in name_tag:
+                    image, tag = name_tag.split(':')
                 else:
-                    task_type = 'dockerfile'
-                if git_url:
-                    new_task['task_dep'].append('git_{}'.format(image))
-                    path = "{}/{}".format(git_repos_path(git_url,
-                                                         git_checkout_type,
-                                                         git_checkout)
-                                          ,path)
-                if task_type == 'shell':
-                    if not path:
-                        path = '.'
-                    new_task['actions'].append(
-                        shell_build(task_description['shell_action'],image,path=path,
-                                    force=dodocker_config.get('no_cache',False)))
-                elif task_type == 'dockerfile':
-                    buildargs = [(str(k),str(v)) for k,v in paramize_run.items() if not k == 'tags']
-                    pull = task_description.get('pull',False)
-                    rm = task_description.get('rm',True)
-                    tmp_image_name = image + ':' + hashlib.md5(
-                        str(sorted(buildargs,key=lambda a:a[0])).encode('utf-8')).hexdigest()
-                    new_task['actions'].append(
-                        docker_build(path,image_name=tmp_image_name,
-                                     dockerfile=dockerfile,
-                                     buildargs=buildargs,pull=pull,rm=rm))
+                    image = name_tag
+                    tag = None
+                doit_task['actions'] = [docker_push('{}/{}'.format(dodocker_config['registry_path'],image), tag)]
+        yield doit_task
 
-                # tagging
-                tags = []
-                if 'tags' in task_description:
-                    tags.extend(task_description['tags'])
-                if paramize_run.get('tags'):
-                    tags.extend(paramize_run['tags'])
-                    
-                tag = None
-                image_no_tag = image
-                if ':' in image:
-                    image_no_tag, tag = image.split(':')
-                new_task['actions'].append(docker_tag(
-                    tmp_image_name, '%s/%s' % (dodocker_config['registry_path'],image_no_tag),tag))
-                repo = tag = None
-                for t in tags:
-                    if ':' in t:
-                        repo,tag = t.strip().split(':')
-                        if not repo:
-                            repo = image_no_tag
-                    else:
-                        repo = t
-                        tag = None
-                    new_task['actions'].append(docker_tag(
-                        tmp_image_name,'%s/%s' % (dodocker_config['registry_path'],repo) ,tag=tag))
-                    new_task['actions'].append(docker_tag(tmp_image_name,repo ,tag=tag))
-
-                """ IMPORTANT: 
-                    image_id has to be the last action. The output of the last action is 
-                    used for result_dep by doit
-                """
-                new_task['actions'].append(image_id(tmp_image_name))
-
-                # intra build dependencies 
-                if task_description.get('file_dep'):
-                    new_task['file_dep'] = [os.path.join(path,i) 
-                                        for i in task_description.get('file_dep')]
-                elif path:
-                    new_task['file_dep'] = get_file_dep(path)
-                if 'depends' in task_description:
-                    new_task['uptodate'].append(result_dep('%s_%s' % (mode,depends_subtask_name)))
-
-                if ( dodocker_config.get('no_cache') and
-                     ( not dodocker_config['no_cache_targets'] or
-                       image in dodocker_config['no_cache_targets'] )):
-                    # the image is not up to date when the cache is disabled by the user
-                    # thus return always False
-                    new_task['uptodate'].append(lambda x=None: False)
-                else:
-                    # an image has to be available
-                    new_task['uptodate'].append(check_available(tmp_image_name))
-                # every task has to run once to build the result_dep chain for every image
-                new_task['uptodate'].append(run_once)
-        elif mode == 'upload':
-            tag = None
-            if ':' in image:
-                image, tag = image.split(':')
-            new_task['actions'] = [docker_push('%s/%s' % (dodocker_config['registry_path'],image), tag)]
-        yield new_task
-    if parse_errors:
-        sys.exit("\n".join(parse_errors))
-
-def task_git():
-    all_build_tasks = []
-    for task in parse_dodocker_yaml('git'):
-        all_build_tasks.append(task['basename'])
-        yield task
-    if all_build_tasks:
-        yield {'basename':'git',
-               'actions': None,
-               'task_dep': all_build_tasks}
 
 """
 ==============================
@@ -431,9 +261,26 @@ D O I T - M A I N  - T A S K S
 ==============================
 """
 
+def create_task_config_list():
+    tg = parser.TaskGroup()
+    tg.load_task_description_from_file(filename=parsed[0].dodocker_file)
+    return tg.create_group_data()
+
+def task_git():
+    all_build_tasks = []
+    task_config_list = create_task_config_list()
+    for task in create_doit_tasks('git',task_config_list):
+        all_build_tasks.append(task['basename'])
+        yield task
+    if all_build_tasks:
+        yield {'basename':'git',
+               'actions': None,
+               'task_dep': all_build_tasks}
+
 def task_build():
     all_build_tasks = []
-    for task in parse_dodocker_yaml('build'):
+    task_config_list = create_task_config_list()
+    for task in create_doit_tasks('build',task_config_list):
         all_build_tasks.append(task['basename'])
         yield task
     if all_build_tasks:
@@ -443,7 +290,8 @@ def task_build():
 
 def task_upload():
     all_upload_tasks = []
-    for task in parse_dodocker_yaml('upload'):
+    task_config_list = create_task_config_list()
+    for task in create_doit_tasks('upload',task_config_list):
         all_upload_tasks.append(task['basename'])
         yield task
 
@@ -515,8 +363,6 @@ Argument parsing and processing
 """
 
 def process_args(parsed,unparsed):
-    if parsed.yamldir:
-        os.chdir(parsed.yamldir)
     sys.argv = [sys.argv[0]]
     if parsed.output_file:
         sys.argv.extend(('-o',parsed.output_file))
@@ -566,9 +412,9 @@ def create_parser():
     parser.add_argument('-c', dest='configfile',
                         metavar='config file',
                         help='use this dodocker config file')
-    parser.add_argument('-d', dest='yamldir',
-                        metavar='directory',
-                        help='this directory contains the dodocker.yaml file')
+    parser.add_argument('-d', '--dodocker-file', dest='dodocker_file',
+                        default='dodocker.yaml',
+                        help='alternate path to a dodocker yaml description file')
     parser.add_argument('-o', dest='output_file',
                         metavar='report output file',
                         help='capture report in output file')
@@ -621,7 +467,10 @@ Entry points
 """
 
 def run_dodocker_cli(args):
-    # helper function for external programs like tests
+    """
+    helper function for external programs like tests
+    """
+    global parsed
     parser = create_parser()
     parsed = parser.parse_known_args(args)
     dodocker_config.clear()
@@ -633,8 +482,9 @@ def run_dodocker_cli(args):
         # catch normal zero exit, but re-raise other
         if e.code != 0:
             raise
-
+        
 def main():
+    global parsed
     parser = create_parser()
     parsed = parser.parse_known_args()
     dodocker_config.update(load_dodocker_config())
