@@ -26,16 +26,17 @@ class TaskInfo:
         self.rm = None
         self.tags = None
         self.task_type = None
-
+        self.file_dep = None
+        
 class TaskGroup:
     def __init__(self):
         self.task_descriptions = None
-    def load_task_descriptions_from_file(self, filename='dodocker.yaml'):
+    def load_task_description_from_file(self, filename='dodocker.yaml'):
         try:
-            with open('dodocker.yaml','r') as f:
-                self.load_task_descriptions(f.read())
+            with open(filename, 'r') as f:
+                yaml_data = yaml.safe_load(f.read())
         except IOError:
-            sys.exit('No dodocker.yaml found')
+            sys.exit('No dodocker yaml defintion found at {}'.format(filename))
         self.task_descriptions = yaml_data
     def load_task_descriptions(self, yaml_data):
         self.task_descriptions = yaml.safe_load(yaml_data)
@@ -83,6 +84,7 @@ class TaskGroup:
             t = TaskInfo()
 
             t.image = task_description['image']
+            t.file_dep = task_description.get('file_dep')
             
             t.path = str(task_description.get('path',''))
             if 'shell_action' in task_description:
@@ -125,26 +127,25 @@ class TaskGroup:
             if 'tags' in task_description:
                 unprocessed_tags.extend(task_description['tags'])
             if t.params.get('tags'):
-                unprocessed_tags.extend((':'+i for i in t.params['tags'] if not ':' in i))
-                unprocessed_tags.extend((i for i in t.params['tags'] if ':' in i))
+                unprocessed_tags.extend(t.params['tags'])
 
             tag = None
             t.bare_image_name = t.image
             if ':' in t.image:
                 t.bare_image_name, tag = t.image.split(':')
-            if tag:
-                unprocessed_tags.insert(0,':'+tag)
-            elif not unprocessed_tags:
-                """
-                a image without any tag is only then genereated when
-                there are no other tags defined.
-                """
-                unprocessed_tags.insert(0,t.bare_image_name)
+                # allow a 'forced' empty tag for 'image: "blub:"'
+            if not t.params:
+                if tag:
+                    unprocessed_tags.insert(0,':'+tag)
+                else:
+                    unprocessed_tags.insert(0,t.bare_image_name)
             repo = tag = None
             t.tags = []
             for un_tag in unprocessed_tags:
                 if ':' in un_tag:
                     repo,tag = un_tag.strip().split(':')
+                    if tag == '':
+                        tag = None
                     if not repo:
                         repo = t.bare_image_name
                 else:
@@ -152,5 +153,7 @@ class TaskGroup:
                     tag = None
                 t.tags.append((repo,tag))
             if len(t.tags) != len(set(t.tags)):
-                raise DodockerParseError('Duplicated name:tags are not allowed. Offending name:tags are {}'.format(t.tags))
+                raise DodockerParseError('Duplicated name:tags are not allowed. name:tags are {}'.format(t.tags))
+            # t.doit_image_name must contain a unique image name to serve as a doit task name
+            t.doit_image_name = ':'.join(filter(lambda x:x, t.tags[0]))
             yield t                
