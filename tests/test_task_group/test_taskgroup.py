@@ -88,6 +88,7 @@ class TestTasks:
         assert td.dockerfile == None
         assert td.task_type == 'shell'
         assert td.doit_image_name == 'testimagename2'
+        assert td.shell_action == 'make something'
         
     def test_git(self):
         t = TaskGroup()
@@ -454,7 +455,101 @@ class TestTasks:
         with pytest.raises(DodockerParseError):
             d = list(t.create_group_data())
 
-#    def test_wrong_type_of_(self):
-#        raise
+    def test_parameter_matrix_not_yet_implemented(self):
+        t = TaskGroup()
+        t.load_task_descriptions(
+        '''
+        - image: someimage
+          path: image1
+          parameter:
+            mode: matrix
+        ''')
+        with pytest.raises(DodockerParseError):
+            d = list(t.create_group_data())
 
+    def test_parameter_no_shell_actions_allowed(self):
+        t = TaskGroup()
+        t.load_task_descriptions(
+        '''
+        - image: someimage
+          path: image1
+          shell_action: sh test.sh
+          parameter:
+            mode: fixed
+        ''')
+        with pytest.raises(DodockerParseError):
+            d = list(t.create_group_data())
+
+    def test_parameter_no_tags_attribute_allowed(self):
+        t = TaskGroup()
+        t.load_task_descriptions(
+        '''
+        - image: someimage:sometag
+          path: image1
+          parameter:
+            mode: fixed
+          tags:
+            - :bla
+        ''')
+        with pytest.raises(DodockerParseError):
+            d = list(t.create_group_data())
+
+    def test_parameter_must_have_tags_in_every_parameter_item(self):
+        t = TaskGroup()
+        t.load_task_descriptions(
+        '''
+        - image: someimage
+          path: image1
+          parameter:
+            mode: fixed
+            setup:
+              - a: eins
+                b: zwei
+                tags: :v1
+              - a: one
+              - b: two
+        ''')
+        with pytest.raises(DodockerParseError):
+            d = list(t.create_group_data())
+
+    def test_read_from_file(self, tmpdir):
+        dd_yaml = tmpdir.join('dodocker.yaml')
+        dd_yaml.write('''
+        - image: test
+          path: .
+        ''')
+        with tmpdir.as_cwd():
+            t = TaskGroup()
+            t.load_task_description_from_file()
+            assert t.task_descriptions[0]['image'] == 'test'
+
+    def test_read_from_file_fail_for_non_exist(self, tmpdir):
+        with tmpdir.as_cwd():
+            t = TaskGroup()
+            with pytest.raises(SystemExit):
+                t.load_task_description_from_file()
+
+    def test_handling_of_empty_tags(self):
+        t = TaskGroup()
+        t.load_task_descriptions(
+        '''
+        - image: testimagename
+          path: testpath
+          tags:
+            - "blub:"
+        ''')
+        d = list(t.create_group_data())
+        assert len(d) == 1
+        td = d[0]
+        assert td.bare_image_name == 'testimagename'
+        assert td.path == 'testpath'
+        assert td.dockerfile == 'Dockerfile'
+        assert td.task_type == 'dockerfile'
+        assert td.file_dep == None
+        assert not td.pull
+        assert td.rm == True
+        assert td.tags == [('testimagename',None),
+                           ('blub',None)]
+        assert td.doit_image_name == 'testimagename'
+            
         

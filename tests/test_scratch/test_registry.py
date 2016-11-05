@@ -50,4 +50,5 @@ class TestRegistry:
         data = requests.get('http://localhost:5000/v2/_catalog').json()
         assert set(data['repositories']) == set(('dodockertest/test1',
                                                  'dodockertest/test2',
-                                                 'dodockertest/test3'))
+                                                 'dodockertest/test3',
+                                                 'dodockertestother'))

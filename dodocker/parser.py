@@ -4,7 +4,7 @@ dodocker.yaml parser
 ======================
 """
 
-import yaml, os
+import yaml, os, sys
 import dodocker
 
 class DodockerParseError(Exception):
@@ -89,6 +89,7 @@ class TaskGroup:
             t.path = str(task_description.get('path',''))
             if 'shell_action' in task_description:
                 t.task_type = 'shell'
+                t.shell_action = task_description['shell_action']
             else:
                 t.task_type = 'dockerfile'
                 t.dockerfile = task_description.get('dockerfile','Dockerfile')

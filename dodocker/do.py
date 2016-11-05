@@ -204,21 +204,19 @@ def create_doit_tasks(mode, task_list):
                     shell_build(ddtask.shell_action, ddtask.doit_image_name, path=ddtask.path,
                                 force=dodocker_config.get('no_cache',False)))
             elif ddtask.task_type == 'dockerfile':
-                """ 
-                the first name:tag pair is used for the build and
-                available in ddtask.doit_image_name. So pop it to avoid tagging with itself.
-                """
-                ddtask.tags.pop(0) 
                 doit_task['actions'].append(
                     docker_build(ddtask.path, image_name=ddtask.doit_image_name,
                                  dockerfile=ddtask.dockerfile,
                                  buildargs=ddtask.buildargs, pull=ddtask.pull,rm=ddtask.rm))
 
             for image_no_tag, tag in ddtask.tags: 
-                doit_task['actions'].append(docker_tag(
-                    ddtask.doit_image_name,
-                    '%s/%s' % (dodocker_config['registry_path'],image_no_tag),
-                    tag))
+                doit_task['actions'].append(
+                    docker_tag(
+                        ddtask.doit_image_name,
+                        '%s/%s' % (dodocker_config['registry_path'],image_no_tag),
+                        tag))
+                doit_task['actions'].append(
+                    docker_tag(ddtask.doit_image_name, image_no_tag, tag))
             """ IMPORTANT: 
                 image_id has to be the last action. The output of the last action is 
                 used for result_dep by doit
@@ -244,14 +242,9 @@ def create_doit_tasks(mode, task_list):
             # every task has to run once to build the result_dep chain for every image
             doit_task['uptodate'].append(run_once)
         elif mode == 'upload':
-            tag = None
-            for name_tag in ddtask.tags:
-                if ':' in name_tag:
-                    image, tag = name_tag.split(':')
-                else:
-                    image = name_tag
-                    tag = None
-                doit_task['actions'] = [docker_push('{}/{}'.format(dodocker_config['registry_path'],image), tag)]
+            doit_task['actions'] = []
+            for image,tag in ddtask.tags:
+                doit_task['actions'].append(docker_push('{}/{}'.format(dodocker_config['registry_path'],image), tag))
         yield doit_task
 
 
