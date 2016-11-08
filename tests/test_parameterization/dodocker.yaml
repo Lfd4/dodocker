@@ -1,15 +1,19 @@
 - image: dodockertest/paramtest1
   path: image1
-  parameterization:
+  parameter:
     mode: fixed
     setup:
       - a: one
         b: two
         c: three
-        tags: [v1]
+        tags:
+          - v1
       - b: no_default
-        tags: [v2]
+        tags:
+          - v2
       - a: eins
         b: zwei
         c: drei
-        tags: [v3,latest]
+        tags:
+          - v3
+          - latest
