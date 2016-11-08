@@ -1,6 +1,7 @@
 import pytest
 from distutils.dir_util import copy_tree
-import os, hashlib, subprocess, time
+import os, hashlib, subprocess, time, docker, tarfile
+from io import BytesIO
 
 @pytest.yield_fixture(scope='module')
 def tmpdir_copy(tmpdir_factory, request):
@@ -34,7 +35,7 @@ def on_session_start_end_clean_docker_from_testimages():
     find_and_delete_testimages()
     
 @pytest.yield_fixture(scope='session')
-def docker_registry(scope='session'):
+def docker_registry():
     subprocess.check_call(
         ['docker run -d -p 5000:5000 --name dodockerregistry registry:2'],
         shell=True)
@@ -43,3 +44,18 @@ def docker_registry(scope='session'):
     subprocess.check_call(
         ['docker stop dodockerregistry && docker rm dodockerregistry'],
         shell=True)
+
+@pytest.yield_fixture(scope='session')
+def docker_helper():
+    yield DockerHelper()
+    
+class DockerHelper:
+    def __init__(self):
+        self.dc = docker.Client(version='auto')
+    def get_file_contents_from_image(self, image, path):
+        container = self.dc.create_container(image, '/bin/true')
+        tar_stream, stat = self.dc.get_archive(container, path)
+        with tarfile.TarFile(fileobj=BytesIO(tar_stream.read())) as tf:
+            data = tf.extractfile(path)
+        self.dc.remove_container(container)
+        return data.read()
