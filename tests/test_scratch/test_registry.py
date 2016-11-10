@@ -13,25 +13,34 @@ class TestRegistryParams:
             out, err = capsys.readouterr()
             assert 'registry_path : localhost:5000' in out
             assert 'insecure : True' in out
-
+            assert 'push_retries : 3' in out
+            assert 'push_retry_wait : 2' in out
             run_dodocker_cli(['config','--set-secure'])
             run_dodocker_cli(['config','--list'])
             out, err = capsys.readouterr()
             assert 'registry_path : localhost:5000' in out
             assert 'insecure : False' in out
+            assert 'push_retries : 3' in out
+            assert 'push_retry_wait : 2' in out
 
             run_dodocker_cli(['config','--set-registry-path','my.registry.com:443'])
             run_dodocker_cli(['config','--list'])
             out, err = capsys.readouterr()
             assert 'registry_path : my.registry.com:443' in out
             assert 'insecure : False' in out
+            assert 'push_retries : 3' in out
+            assert 'push_retry_wait : 2' in out
 
             run_dodocker_cli(['config','--set-registry-path','localhost:5000'])
             run_dodocker_cli(['config','--set-insecure'])
+            run_dodocker_cli(['config','--set-retries','4'])
+            run_dodocker_cli(['config','--set-retry-wait','3'])
             run_dodocker_cli(['config','--list'])
             out, err = capsys.readouterr()
             assert 'registry_path : localhost:5000' in out
             assert 'insecure : True' in out
+            assert 'push_retries : 4' in out
+            assert 'push_retry_wait : 3' in out
 
 class TestRegistry:
     def test_given_build(self,tmpdir_copy):
@@ -52,3 +61,4 @@ class TestRegistry:
                                                  'dodockertest/test2',
                                                  'dodockertest/test3',
                                                  'dodockertestother'))
+

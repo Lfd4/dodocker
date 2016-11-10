@@ -97,9 +97,18 @@ def docker_tag(image,repository,tag=None):
 def docker_push(repository,tag):
     def docker_push_callable():
         error = False
+        try_count = dodocker_config['push_retries']
         print("push:",repository,tag)
         try:
-            result = doc.push(repository,stream=True,tag=tag,insecure_registry=dodocker_config['insecure'])
+            while try_count > 0:
+                try_count -= 1
+                try:
+                    result = doc.push(repository,stream=True,tag=tag,insecure_registry=dodocker_config['insecure'])
+                    try_count = 0
+                except requests.ReadTimeoutError:
+                    if try_count < 1:
+                        raise DodockerRegistryError('registry failed to answer after retrying request')
+                    time.sleep(dodocker_config['push_retry_wait'])
         except docker.errors.DockerException as e:
             sys.exit(e)
         for line in result:

@@ -10,6 +10,7 @@ setup(
                         'PyYAML',
                         'doit',
                         'GitPython',
+                        'requests',
                         ],
     package_data = {},
     author = 'Andreas Elvers',

@@ -22,8 +22,10 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-DEFAULT_DODOCKER_CONFIG = {'registry_path' : 'localhost:5000',
-                           'insecure'      : True}
+DEFAULT_DODOCKER_CONFIG = {'registry_path'   : 'localhost:5000',
+                           'insecure'        : True,
+                           'push_retries'    : 3,
+                           'push_retry_wait' : 2}
 
 DOIT_CONFIG = {'default_tasks': ['build']}
 
@@ -56,14 +58,14 @@ You may obtain a copy of the License at:
 """
 
 def load_dodocker_config():
+    config = DEFAULT_DODOCKER_CONFIG 
     if os.path.exists(dodocker_config_path):
         try:
             with open(dodocker_config_path,'r') as f:
-                config = yaml.safe_load(f.read())
+                config.update(yaml.safe_load(f.read()))
         except IOError:
             sys.exit('Failed to read {}'.format(dodocker_config_path))
-        return config
-    return DEFAULT_DODOCKER_CONFIG
+    return config
     
 def save_dodocker_config(config):
     try:
@@ -81,7 +83,7 @@ def config_set(key,value):
 
 def config_list():
     config = load_dodocker_config()
-    for key in config:
+    for key in sorted(config.keys()):
         print('{} : {}'.format(key,config[key]))
 
 """
@@ -121,6 +123,10 @@ def process_args(parsed,unparsed):
             config_set('insecure',True)
         elif parsed.set_registry_path:
             config_set('registry_path', parsed.set_registry_path)
+        elif parsed.set_retries:
+            config_set('push_retries', parsed.set_retries)
+        elif parsed.set_retry_wait:
+            config_set('push_retry_wait', parsed.set_retry_wait)
         sys.exit(0)
     elif parsed.subcommand == 'alias':
         print("alias dodocker='docker run --rm --privileged -itv /var/run/docker.sock:/var/run/docker.sock {} -v $(pwd):/build nawork/dodocker dodocker'".format(
@@ -175,9 +181,15 @@ def create_parser():
     group = config_parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--set-insecure', action='store_true',
                        help='given registry is connected insecure (http/self-signed)')
-    group.add_argument('--set-secure', action='store_true',
-                       help='given registry is connected secure')
-    group.add_argument('--set-registry-path', help='url to registry',metavar='url')
+    group.add_argument(
+        '--set-secure', action='store_true', help='given registry is connected secure')
+    group.add_argument(
+        '--set-registry-path', help='url to registry',metavar='url')
+    group.add_argument(
+        '--set-retries', help='max retries when pushing to registry',metavar='retries', type=int)
+    group.add_argument(
+        '--set-retry-wait', type=int,
+        help='time in seconds to wait before retrying push to registry',metavar='retries')
     group.add_argument('--list',dest='config_mode', action='store_const', const='list')
     alias_parser = subparsers.add_parser(
         'alias',
