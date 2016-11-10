@@ -28,7 +28,7 @@ import git
 dodocker_config = None
 
 doc = docker.Client(base_url='unix://var/run/docker.sock',
-                    version='1.17',
+                    version='auto',
                     timeout=10)
 
 
@@ -64,7 +64,8 @@ def docker_build(path,image_name,dockerfile,buildargs=None,pull=False,rm=True):
     def docker_build_callable():
         error = False
         print(path,image_name,buildargs)
-        for line in doc.build(path,tag=image_name,stream=True,pull=pull,dockerfile=dockerfile,
+        for line in doc.build(path,tag=image_name,stream=True,pull=pull,
+                              dockerfile=dockerfile, buildargs=buildargs,
                               rm=rm,nocache=dodocker_config.get('no_cache',False)):
             line_parsed = json.loads(line.decode('utf-8'))
             if 'stream' in line_parsed:
