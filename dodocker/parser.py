@@ -23,10 +23,8 @@ dodocker.yaml parser
 
 import yaml, os, sys
 import dodocker
+from .errors import DodockerParseError
 
-class DodockerParseError(Exception):
-    pass
-        
 class TaskInfo:
     def __init__(self):
         self.bare_image_name = None

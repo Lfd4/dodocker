@@ -19,6 +19,7 @@ limitations under the License.
 
 
 import os, yaml, json, sys, re, time, hashlib, docker
+import requests
 from doit.tools import result_dep, run_once
 from distutils.dir_util import copy_tree
 import subprocess

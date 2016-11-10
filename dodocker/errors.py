@@ -17,8 +17,9 @@ limitations under the License.
 ======================================================================
 """
 
-# package
+class DodockerParseError(Exception):
+    pass
 
-from .main import run_dodocker_cli
-from .errors import *
-import dodocker.do
+class DodockerRegistryError(Exception):
+    pass
+
