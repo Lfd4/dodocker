@@ -4,6 +4,8 @@ config
 \#*\#
 bin/*
 lib/*
+.doit*
+.dodocker.cfg
 include/*
 *.egg-info
 example/.doit.db
