@@ -37,7 +37,7 @@ def on_session_start_end_clean_docker_from_testimages():
 @pytest.yield_fixture(scope='session')
 def docker_registry():
     subprocess.check_call(
-        ['docker run -d -p 5000:5000 --name dodockerregistry registry:2'],
+        ['docker run -d -p 5000:5000 --name dodockerregistry registry:2.5.1'],
         shell=True)
     time.sleep(1) # wait for registry to become really ready
     yield None
@@ -59,3 +59,5 @@ class DockerHelper:
             data = tf.extractfile(path)
         self.dc.remove_container(container)
         return data.read()
+    def inspect_image(self, image):
+        return self.dc.inspect_image(image)

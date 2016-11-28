@@ -1,0 +1,3 @@
+- image: dodockertest/flatten1
+  path: image1
+  flatten: true

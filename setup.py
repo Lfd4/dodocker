@@ -11,6 +11,7 @@ setup(
                         'doit',
                         'GitPython',
                         'requests',
+                        'jinja2',
                         ],
     package_data = {},
     author = 'Andreas Elvers',

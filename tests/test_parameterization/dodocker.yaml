@@ -3,17 +3,27 @@
   parameter:
     mode: fixed
     setup:
-      - BUILD_PARAM_ARG_A: one
-        BUILD_PARAM_ARG_B: two
-        BUILD_PARAM_ARG_C: three
+      - buildargs:
+          BUILD_PARAM_ARG_A: one
+          BUILD_PARAM_ARG_B: two
+          BUILD_PARAM_ARG_C: three
         tags:
           - :v1
-      - BUILD_PARAM_ARG_B: no_default
+      - buildargs:
+          BUILD_PARAM_ARG_B: no_default
         tags:
           - :v2
-      - BUILD_PARAM_ARG_A: eins
-        BUILD_PARAM_ARG_B: zwei
-        BUILD_PARAM_ARG_C: drei
+      - buildargs:
+          BUILD_PARAM_ARG_A: eins
+          BUILD_PARAM_ARG_B: zwei
+          BUILD_PARAM_ARG_C: drei
         tags:
           - :v3
           - :latest
+
+- image: dodockertest/paramtest2
+  path: image1
+  buildargs:
+    BUILD_PARAM_ARG_A: un
+    BUILD_PARAM_ARG_B: dos
+    BUILD_PARAM_ARG_C: tres

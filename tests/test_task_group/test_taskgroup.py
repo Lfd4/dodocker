@@ -72,6 +72,33 @@ class TestTasks:
         with pytest.raises(dodocker.DodockerParseError):
             d = list(t.create_group_data())
 
+    def test_same_image_name_should_error(self):
+        t = TaskGroup()
+        t.load_task_descriptions(
+        '''
+        - image: testimagename
+          path: bla
+        - image: testimagename
+          path: blub
+        ''')
+        with pytest.raises(dodocker.DodockerParseError):
+            d = list(t.create_group_data())
+
+    def test_same_image_tag_should_error(self):
+        t = TaskGroup()
+        t.load_task_descriptions(
+        '''
+        - image: testimg1:v1
+          path: bla
+        - image: testimg2
+          path: blub
+          tags:
+            - testimg1:v1
+        ''')
+        with pytest.raises(dodocker.DodockerParseError):
+            d = list(t.create_group_data())
+
+            
     def test_shell(self):
         t = TaskGroup()
         t.load_task_descriptions(
@@ -400,22 +427,25 @@ class TestTasks:
         t = TaskGroup()
         t.load_task_descriptions(
         '''
-        - image: someimage
+        - image: someimage_param
           path: image1
           parameter:
             mode: fixed
             setup:
-              - a: one
-                b: two
-                c: three
+              - buildargs:
+                  a: one
+                  b: two
+                  c: three
                 tags:
                   - :v1
-              - b: no_default
+              - buildargs:
+                  b: no_default
                 tags:
                   - :v2
-              - a: eins
-                b: zwei
-                c: drei
+              - buildargs:
+                  a: eins
+                  b: zwei
+                  c: drei
                 tags:
                   - :v3
                   - :latest
@@ -427,14 +457,14 @@ class TestTasks:
         assert td1.buildargs == {'a':'one','b':'two','c':'three'}
         assert td2.buildargs == {'b':'no_default'}
         assert td3.buildargs == {'a':'eins','b':'zwei','c':'drei'}
-        assert td1.tags == [('someimage','v1')]
-        assert td2.tags == [('someimage','v2')]
-        assert td3.tags == [('someimage','v3'),
-                            ('someimage','latest'),
+        assert td1.tags == [('someimage_param','v1')]
+        assert td2.tags == [('someimage_param','v2')]
+        assert td3.tags == [('someimage_param','v3'),
+                            ('someimage_param','latest'),
                             ('bla','blub')]
-        assert td1.doit_image_name == 'someimage:v1'
-        assert td2.doit_image_name == 'someimage:v2'
-        assert td3.doit_image_name == 'someimage:v3'
+        assert td1.doit_image_name == 'someimage_param:v1'
+        assert td2.doit_image_name == 'someimage_param:v2'
+        assert td3.doit_image_name == 'someimage_param:v3'
 
     def test_parameter_image_attribute_no_tag_allowed(self):
         t = TaskGroup()

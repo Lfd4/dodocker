@@ -19,7 +19,7 @@ limitations under the License.
 
 
 import os, yaml, json, sys, re, time, hashlib, docker
-import requests
+import requests, shutil
 from doit.tools import result_dep, run_once
 from distutils.dir_util import copy_tree
 import subprocess
@@ -60,13 +60,32 @@ def check_available(image):
         return True
     return check_available_callable
 
-def docker_build(path,image_name,dockerfile,buildargs=None,pull=False,rm=True):
+def docker_build(ddtask):
     def docker_build_callable():
         error = False
-        print(path,image_name,buildargs)
-        for line in doc.build(path,tag=image_name,stream=True,pull=pull,
-                              dockerfile=dockerfile, buildargs=buildargs,
-                              rm=rm,nocache=dodocker_config.get('no_cache',False)):
+        print(ddtask.path, ddtask.doit_image_name, ddtask.buildargs)
+        if ddtask.templates and ddtask.jinja_env:
+            build_path = dodocker_build_path(repository_name=ddtask.doit_image_name)
+            if os.path.exists(build_path):
+                shutil.rmtree(build_path)
+            shutil.copytree(ddtask.path, build_path)
+            for tmpl_path in ddtask.jinja_env.list_templates():
+                if tmpl_path.endswith('.j2'):
+                    destination, rest = os.path.splitext(tmpl_path)
+                else:
+                    destination = tmpl_path
+                with open(os.path.join(build_path, destination),'w') as f:
+                    f.write(ddtask.jinja_env.get_template(tmpl_path).render(
+                        template=ddtask.templateargs,
+                        t=ddtask.templateargs,
+                        build=ddtask.buildargs,
+                        b=ddtask.buildargs))
+        else:
+            build_path = ddtask.path
+        for line in doc.build(build_path, tag=ddtask.doit_image_name, stream=True,
+                              pull=ddtask.pull, dockerfile=ddtask.dockerfile,
+                              buildargs=ddtask.buildargs, rm=ddtask.rm,
+                              nocache=dodocker_config.get('no_cache',False)):
             line_parsed = json.loads(line.decode('utf-8'))
             if 'stream' in line_parsed:
                 sys.stdout.write(line_parsed['stream'])
@@ -75,6 +94,14 @@ def docker_build(path,image_name,dockerfile,buildargs=None,pull=False,rm=True):
                 error = True
         return not error
     return docker_build_callable
+
+def docker_flatten(ddtask):
+    def docker_flatten_callable():
+        container = doc.create_container(ddtask.doit_image_name,'/data')
+        stream, stat = doc.get_archive(container,'/')
+        stripped_image = doc.import_image(stream, ddtask.doit_image_name)
+        return True
+    return docker_flatten_callable
 
 def shell_build(shell_cmd,image,path='.',force=False):
     def docker_build_callable():
@@ -131,13 +158,17 @@ def get_file_dep(path):
             file_list.append(os.path.join(root,i))
     return file_list
 
-def git_repos_path(url,checkout_type, checkout):
-    return "dodocker_repos/{}".format(hashlib.md5(".".join((url,checkout_type,checkout)).encode('utf-8')).hexdigest())
+def dodocker_build_path(url=None, checkout_type=None, checkout=None, repository_name=None):
+    return "dodocker_repos/{}".format(
+        hashlib.md5(".".join((str(url),
+                              str(checkout_type),
+                              str(checkout),
+                              str(repository_name))).encode('utf-8')).hexdigest())
 
 def update_git(git_url, checkout_type, checkout):
     def update_git_callable():
         error = False
-        path = git_repos_path(git_url,checkout_type,checkout)
+        path = dodocker_build_path(git_url,checkout_type,checkout)
         if os.path.exists(path):
             if checkout_type in ('commit','tags'):
                 # commit and tags don't change
@@ -182,9 +213,9 @@ def create_doit_tasks(mode, task_list):
 
         if mode == 'git':
             if ddtask.git_url:
-                doit_task['actions']=[update_git(ddtask.git_url,
-                                                ddtask.git_checkout_type,
-                                                ddtask.git_checkout)]
+                doit_task['actions'] = [update_git(ddtask.git_url,
+                                                   ddtask.git_checkout_type,
+                                                   ddtask.git_checkout)]
             else:
                 continue
 
@@ -193,7 +224,7 @@ def create_doit_tasks(mode, task_list):
 
             if ddtask.git_url:
                 doit_task['task_dep'].append('git_{}'.format(ddtask.doit_image_name))
-                path = "{}/{}".format(git_repos_path(ddtask.git_url,
+                path = "{}/{}".format(dodocker_build_path(ddtask.git_url,
                                                      ddtask.git_checkout_type,
                                                      ddtask.git_checkout)
                                       ,ddtask.path)
@@ -203,10 +234,10 @@ def create_doit_tasks(mode, task_list):
                                 force=dodocker_config.get('no_cache',False)))
             elif ddtask.task_type == 'dockerfile':
                 doit_task['actions'].append(
-                    docker_build(ddtask.path, image_name=ddtask.doit_image_name,
-                                 dockerfile=ddtask.dockerfile,
-                                 buildargs=ddtask.buildargs, pull=ddtask.pull,rm=ddtask.rm))
-
+                    docker_build(ddtask))
+                if ddtask.flatten:
+                    doit_task['actions'].append(
+                        docker_flatten(ddtask))
             for image_no_tag, tag in ddtask.tags: 
                 doit_task['actions'].append(
                     docker_tag(
@@ -258,7 +289,6 @@ task_config_list = None
 
 def task_git():
     all_git_tasks = []
-    
     for task in create_doit_tasks('git',task_config_list):
         all_git_tasks.append(task['basename'])
         yield task
@@ -267,6 +297,7 @@ def task_git():
                'actions': None,
                'task_dep': all_git_tasks}
 
+        
 def task_build():
     all_build_tasks = []
     for task in create_doit_tasks('build',task_config_list):

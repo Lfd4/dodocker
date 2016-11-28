@@ -22,8 +22,14 @@ dodocker.yaml parser
 """
 
 import yaml, os, sys
+import jinja2
 import dodocker
 from .errors import DodockerParseError
+
+class AttrDict(dict):
+    def __init__(self, *args, **kwargs):
+        super(AttrDict, self).__init__(*args, **kwargs)
+        self.__dict__ = self
 
 class TaskInfo:
     def __init__(self):
@@ -37,24 +43,33 @@ class TaskInfo:
         self.image = None
         self.params = None
         self.path = None
-        self.pull = None
-        self.rm = None
+        self.pull = False
+        self.flatten = False
+        self.rm = True
         self.tags = None
         self.task_type = None
         self.file_dep = None
+        self.templates = None
+        self.templateargs = None
+        self.jinja_env = None
+
         
 class TaskGroup:
     def __init__(self):
         self.task_descriptions = None
+        self.base_directory = None
     def load_task_description_from_file(self, filename='dodocker.yaml'):
+        self.base_directory = os.path.split(os.path.realpath(filename))[0]
         try:
             with open(filename, 'r') as f:
                 yaml_data = yaml.safe_load(f.read())
         except IOError:
             sys.exit('No dodocker yaml defintion found at {}'.format(filename))
         self.task_descriptions = yaml_data
+        
     def load_task_descriptions(self, yaml_data):
         self.task_descriptions = yaml.safe_load(yaml_data)
+        
     def create_group_data(self):
         parse_errors = []
         group_tags = set()
@@ -97,7 +112,7 @@ class TaskGroup:
             # general task attributes
 
             t = TaskInfo()
-
+            t.task_group = self
             t.image = task_description['image']
             t.file_dep = task_description.get('file_dep')
             
@@ -111,8 +126,13 @@ class TaskGroup:
             if not t.path:
                 raise DodockerParseError('image {}: no path given'.format(t.image))
 
-            t.params = param_item
-
+            if param:
+                t.buildargs = AttrDict(param_item.get('buildargs', {}))
+                t.templateargs = AttrDict(param_item.get('templateargs', {}))
+            else:
+                t.buildargs = AttrDict(task_description.get('buildargs', {}))
+                t.templateargs = AttrDict(task_description.get('templateargs', {}))
+            
             t.git_url = git_checkout = git_checkout_type = None
             git_options = task_description.get('git_url',"").split()
             if git_options:
@@ -127,30 +147,29 @@ class TaskGroup:
                 else:
                     t.git_checkout_type = 'branch'
                     t.git_checkout = 'master'
-                t.path = os.path.join(dodocker.do.git_repos_path(t.git_url,
-                                                                 t.git_checkout_type,
-                                                                 t.git_checkout)
+                t.path = os.path.join(dodocker.do.dodocker_build_path(t.git_url,
+                                                                      t.git_checkout_type,
+                                                                      t.git_checkout)
                                       ,t.path)
 
             t.depends_subtask_name = task_description.get('depends')
 
             if t.task_type == 'dockerfile':
-                t.buildargs = {str(k):str(v) for k,v in t.params.items() if not k == 'tags'}
-                t.pull = task_description.get('pull',False)
-                t.rm = task_description.get('rm',True)
+                t.pull = task_description.get('pull', False)
+                t.flatten = task_description.get('flatten', False)
+                t.rm = task_description.get('rm', True)
 
             unprocessed_tags = []
             if 'tags' in task_description:
                 unprocessed_tags.extend(task_description['tags'])
-            if t.params.get('tags'):
-                unprocessed_tags.extend(t.params['tags'])
+            if param_item.get('tags'):
+                unprocessed_tags.extend(param_item['tags'])
 
             tag = None
             t.bare_image_name = t.image
             if ':' in t.image:
                 t.bare_image_name, tag = t.image.split(':')
-                # allow a 'forced' empty tag for 'image: "blub:"'
-            if not t.params:
+            if not param_item:
                 if tag:
                     unprocessed_tags.insert(0,':'+tag)
                 else:
@@ -172,4 +191,21 @@ class TaskGroup:
                 raise DodockerParseError('Duplicated name:tags are not allowed. name:tags are {}'.format(t.tags))
             # t.doit_image_name must contain a unique image name to serve as a doit task name
             t.doit_image_name = ':'.join(filter(lambda x:x, t.tags[0]))
+            # template scan
+            t.templates = task_description.get('templates',())
+            template_dict = {}
+            for tmpl_path in t.templates:
+                tpath = os.path.join(t.path, tmpl_path)
+                assert os.path.realpath(tpath).startswith(self.base_directory)
+                with open(tpath,'r') as fh:
+                    template_dict[tmpl_path] = fh.read()
+            if template_dict:
+                t.jinja_env = jinja2.Environment(
+                    loader=jinja2.DictLoader(template_dict))
+                for tmpl_path in t.jinja_env.list_templates():
+                    rendered = t.jinja_env.get_template(tmpl_path).render(
+                        template = t.templateargs,
+                        t = t.templateargs,
+                        build = t.buildargs,
+                        b = t.buildargs)
             yield t                
