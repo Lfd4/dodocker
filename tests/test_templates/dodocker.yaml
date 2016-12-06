@@ -1,0 +1,15 @@
+- image: dodockertest/template-test-scratch
+  path: image1
+  templates:
+    - Dockerfile
+    - someotherfile.txt.j2
+  templateargs:
+    imagename: scratch
+
+- image: dodockertest/template-test-busybox
+  path: image1
+  templates:
+    - Dockerfile
+    - someotherfile.txt.j2
+  templateargs:
+    imagename: busybox

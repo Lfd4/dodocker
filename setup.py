@@ -10,6 +10,8 @@ setup(
                         'PyYAML',
                         'doit==0.29',
                         'GitPython',
+                        'requests',
+                        'jinja2',
                         ],
     package_data = {},
     author = 'Andreas Elvers',
@@ -19,5 +21,5 @@ setup(
     keywords = ['docker','authoring','development'],
     download_url = 'https://github.com/nawork/dodocker/tarball/1.0a01',
     url = 'http://www.work.de/dodocker',
-    entry_points = {'console_scripts': ['dodocker = dodocker.do:main']}
+    entry_points = {'console_scripts': ['dodocker = dodocker.main:main']}
 )
