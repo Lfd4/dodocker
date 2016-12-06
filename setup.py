@@ -8,7 +8,7 @@ setup(
     packages = find_packages(),
     install_requires = ['docker-py',
                         'PyYAML',
-                        'doit',
+                        'doit==0.29',
                         'GitPython',
                         ],
     package_data = {},
