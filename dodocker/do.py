@@ -97,9 +97,11 @@ def docker_build(ddtask):
 
 def docker_flatten(ddtask):
     def docker_flatten_callable():
-        container = doc.create_container(ddtask.doit_image_name,'/data')
+        container = doc.create_container(ddtask.doit_image_name,'')
         stream, stat = doc.get_archive(container,'/')
-        stripped_image = doc.import_image(stream, ddtask.doit_image_name)
+        # filter out container runtime
+        filtered_stream = tarfile.TarFile()
+        stripped_image = doc.import_image(filtered_stream, ddtask.doit_image_name)
         return True
     return docker_flatten_callable
 
